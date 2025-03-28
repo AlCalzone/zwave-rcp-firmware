@@ -1,0 +1,21 @@
+#CRC Codes for initially generated config files -- do not modify!
+emlib_core_debug_config.h=-212744839
+rail/profile_wisun_fan_1_0.restriction=-775004010
+rail/profile_wisun_fan_1_1.restriction=599944552
+rail/profile_wisun_han.restriction=-2037823030
+rail/radio_settings.radioconf=-1183941622
+sl_clock_manager_oscillator_config.h=-617502244
+sl_clock_manager_tree_config.h=1751839553
+sl_core_config.h=-119586893
+sl_device_init_dcdc_config.h=1498363383
+sl_device_init_emu_config.h=622680131
+sl_interrupt_manager_s2_config.h=1560337863
+sl_memory_config.h=-1757257759
+sl_memory_manager_region_config.h=-1970167949
+sl_rail_sdk_packet_assistant_config.h=-1331118774
+sl_rail_util_callbacks_config.h=-845407485
+sl_rail_util_init_inst0_config.h=-1445379089
+sl_rail_util_pa_config.h=722515443
+sl_rail_util_protocol_config.h=203792978
+sl_rail_util_pti_config.h=167094148
+sl_rail_util_rssi_config.h=-2076214269

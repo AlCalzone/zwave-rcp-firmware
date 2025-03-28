@@ -1,0 +1,10 @@
+{
+	"files.associations": {
+		"tsconfig*.json": "jsonc",
+		"tslint*.json": "jsonc",
+		"*.vbhtml": "razor",
+		"sl_uartdrv_instances.h": "c",
+		"app_process.h": "c",
+		"pin_config.h": "c"
+	}
+}

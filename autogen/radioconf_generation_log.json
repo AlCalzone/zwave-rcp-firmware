@@ -1,0 +1,174 @@
+[
+  {
+    "channel_name": "Protocol_Configuration-Channel_Group_1",
+    "result_code": "0",
+    "error_message": "",
+    "logs": [],
+    "cfg_logs": [
+      {
+        "name": "Enable FEC",
+        "value": "FECTxEnableEnum.DISABLED"
+      },
+      {
+        "name": "Skip 2nd antenna check with phase demod antenna diversity",
+        "value": "Skip2AntModeEnum.NOSKIP2ANT"
+      },
+      {
+        "name": "Preamble Detection Length",
+        "value": 40
+      },
+      {
+        "name": "Injection Side",
+        "value": "LoInjectionSideEnum.HIGH_SIDE"
+      },
+      {
+        "name": "Fast preamble detect",
+        "value": "FastDetectEnum.DISABLED"
+      },
+      {
+        "name": "Acquisition Channel Bandwidth",
+        "value": 750000
+      },
+      {
+        "name": "IF Frequency",
+        "value": 425000
+      },
+      {
+        "name": "RSSI Measurement Period",
+        "value": 3
+      },
+      {
+        "name": "ETSI Category 1 Compatibility",
+        "value": "etsi_cat1_compatible.Normal"
+      },
+      {
+        "name": "Antenna diversity mode",
+        "value": "AntDivModeEnum.DISABLE"
+      },
+      {
+        "name": "Diversity Select-Best repeat",
+        "value": "AntDivRepeatDisModeEnum.REPEATFIRST"
+      },
+      {
+        "name": "Byte position of dynamic length byte",
+        "value": 0
+      },
+      {
+        "name": "Length of the First Word",
+        "value": 8
+      },
+      {
+        "name": "Preamble Binary Pattern",
+        "value": "0101010101010101010101010101010101010101"
+      },
+      {
+        "name": "Syncword Binary Pattern",
+        "value": "1111011010001101"
+      },
+      {
+        "name": "Pre Signal Lock RX Bandwidth [Hz]",
+        "value": 750000
+      },
+      {
+        "name": "Desired Bitrate [bps]",
+        "value": 500000
+      },
+      {
+        "name": "Actual TX Baudrate [baud]",
+        "value": 500000.0
+      },
+      {
+        "name": "Calculated RSSI Offset [dB]",
+        "value": -12.446100897895253
+      },
+      {
+        "name": "Number of Bits Used from Preamble to Syncword [bits]",
+        "value": 8
+      },
+      {
+        "name": "Actual Carrier Frequency [Hz]",
+        "value": 867999989
+      },
+      {
+        "name": "Actual Intermediate Frequency [Hz]",
+        "value": 424995
+      },
+      {
+        "name": "Synthesizer Resolution [Hz]",
+        "value": 24.7955322265625
+      },
+      {
+        "name": "Actual RX Baudrate [baud]",
+        "value": 500009.3902003869
+      },
+      {
+        "name": "Actual Deviation [Hz]",
+        "value": 126426.34101212025
+      },
+      {
+        "name": "Target Modulation Index",
+        "value": 0.5
+      },
+      {
+        "name": "Actual Modulation Index",
+        "value": 0.505705364048481
+      },
+      {
+        "name": "Selected Demodulator",
+        "value": "DemodSelectEnum.TRECS_VITERBI"
+      },
+      {
+        "name": "Carson Bandwidth [Hz]",
+        "value": 750000
+      },
+      {
+        "name": "Theoretical Required Demodulator Bandwidth [Hz]",
+        "value": 550000
+      },
+      {
+        "name": "RX Crystal Accuracy [ppm]",
+        "value": 10
+      },
+      {
+        "name": "TX Crystal Accuracy [ppm]",
+        "value": 10
+      },
+      {
+        "name": "Post Signal Lock RX Bandwidth [Hz]",
+        "value": 550000
+      },
+      {
+        "name": "Actual Demodulator Oversampling Rate",
+        "value": 4.0
+      },
+      {
+        "name": "Raw Data Sampling Rate [sps]",
+        "value": 2000037.5608015475
+      },
+      {
+        "name": "Signal Propagation Delay [symbol]",
+        "value": 11
+      },
+      {
+        "name": "Effective Syncword Length",
+        "value": 24
+      },
+      {
+        "name": "Effective Preamble Length",
+        "value": 32
+      },
+      {
+        "name": "TRECS syncword timeout [us]",
+        "value": 128.0
+      },
+      {
+        "name": "RSSI Update Period [symbol]",
+        "value": 8
+      },
+      {
+        "name": "RSSI Access Time After RX Start [us]",
+        "value": 48.01198495452724
+      }
+    ]
+  }
+]

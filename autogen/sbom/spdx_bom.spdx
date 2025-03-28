@@ -1,0 +1,702 @@
+# TERMS OF USE - SILICON LABORATORIES INC.
+# (With respect to Silicon Labs software components, this Software Bill of Materials (SBOM) is based upon Silicon Labs'
+# review and analysis of the code version when released.  It is provided "AS IS" and does not modify, change or alter
+# the terms or conditions of your use of Silicon Labs' software and/or SDKs based upon license terms and/or agreements
+# associated with this software or SDKs when distributed to you, received by you, or installed by you.  Further, no
+# warranties or obligations are created by this SBOM.  It is your obligation to comply with the terms of licenses
+# referenced in this SBOM.)
+SPDXVersion: SPDX-2.3
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: Silicon-Laboratories
+DocumentNamespace: https://silabs.com
+
+## Creation Information
+Creator: Organization: Silicon Laboratories, Inc.
+Created: 2025-03-28T10:52:31.590581900Z
+## Relationships
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Simplicity SDK Suite
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-EFR32ZG23A020F512GM40
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-clock_manager
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-device_init
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_eusart
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-mpu
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-radio_config_simple_rail_singlephy
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_util_init
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_util_recommended
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-sl_system
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_chip
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_gpio
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_lib_singleprotocol
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_util_init_core
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-device_clock_hal
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-device_init_core
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-sl_system_process_action
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-sl_assert
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_system
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-clock_manager_init_hal_s2
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-device_clock
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-component_catalog
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_emu
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_cmu
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-hal_gpio
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_lib
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_util_pa
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-clock_manager_runtime_hal_s2
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_syscfg
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-device_gpio
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_ldma
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-event_handler
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_msc
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-sl_core
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-hal_common
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_util_built_in_phys
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_common
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_util_protocol
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-device_init_dcdc
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_util_pti
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-device_init_emu
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-cmsis_core
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-interrupt_manager
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-enum
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_core
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-interrupt_manager_cortexm
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_util_features
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-emlib_prs
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-sl_system_init
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-clock_manager_runtime
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-code_classification
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-sl_common
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_util_callbacks
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-rail_util_rssi
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-status
+Relationship: SPDXRef-simplicity_sdk-2024.12.1 CONTAINS SPDXRef-simplicity_sdk-2024.12.1-gpio
+
+## Package Information
+PackageName: EFR32ZG23A020F512GM40
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-EFR32ZG23A020F512GM40
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-EFR32ZG23A020F512GM40 CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Clock Manager
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-clock_manager
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-clock_manager CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Automatic Device Initialization
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-device_init
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-device_init CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: EUSART
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_eusart
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_eusart CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Simple MPU
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-mpu
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-mpu CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Custom Radio Configuration for simple rail singlephy application
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-radio_config_simple_rail_singlephy
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-radio_config_simple_rail_singlephy CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Utility, Initialization
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_util_init
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_util_init CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Utility, Recommended
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_util_recommended
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_util_recommended CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: System Setup
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-sl_system
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-sl_system CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: CHIP
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_chip
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_chip CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: GPIO
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_gpio
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_gpio CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Library, Single Protocol
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_lib_singleprotocol
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: MSLA
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_lib_singleprotocol CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Utility, Initialization Core
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_util_init_core
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_util_init_core CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Device Manager Clock HAL
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-device_clock_hal
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-device_clock_hal CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Core
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-device_init_core
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-device_init_core CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: System Process Action
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-sl_system_process_action
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-sl_system_process_action CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Assert Functions
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-sl_assert
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-sl_assert CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: SYSTEM
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_system
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_system CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Clock Manager Init HAL Series 2
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-clock_manager_init_hal_s2
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-clock_manager_init_hal_s2 CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Device Manager Clock
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-device_clock
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-device_clock CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Component Catalog
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-component_catalog
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-component_catalog CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: EMU
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_emu
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_emu CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: CMU
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_cmu
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_cmu CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: GPIO
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-hal_gpio
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-hal_gpio CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Library, Core
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_lib
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: MSLA
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_lib CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Utility, PA
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_util_pa
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_util_pa CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Clock Manager Runtime HAL Series 2
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-clock_manager_runtime_hal_s2
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-clock_manager_runtime_hal_s2 CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: SYSCFG
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_syscfg
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_syscfg CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Device Manager GPIO
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-device_gpio
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-device_gpio CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: LDMA
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_ldma
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_ldma CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Event Handler
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-event_handler
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-event_handler CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: MSC
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_msc
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_msc CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: core
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-sl_core
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-sl_core CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Common Headers
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-hal_common
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-hal_common CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Utility, Built-in PHYs Across HFXO Frequencies
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_util_built_in_phys
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_util_built_in_phys CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Common Headers
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_common
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_common CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Utility, Protocol
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_util_protocol
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_util_protocol CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: DC-DC Converter
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-device_init_dcdc
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-device_init_dcdc CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Utility, PTI
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_util_pti
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_util_pti CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Energy Management Unit (EMU)
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-device_init_emu
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-device_init_emu CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: CMSIS-Core
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-cmsis_core
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Apache 2.0
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-cmsis_core CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-cmsis_core ANCESTOR_OF SPDXRef-cmsis_core-5.8.0
+
+## Package Information
+PackageName: CMSIS_5
+SPDXID: SPDXRef-cmsis_core-5.8.0
+PackageVersion: 5.8.0
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: ARM-software
+PackageOriginator: Organization: NOASSERTION
+PackageHomePage: https://github.com/ARM-software/CMSIS_5
+ExternalRef: PACKAGE-MANAGER purl pkg:github/ARM-software/CMSIS_5@5.8.0
+PackageComment: <text>The CMSIS is a set of tools, APIs, frameworks, and work flows</text>
+## Relationships
+Relationship: SPDXRef-cmsis_core-5.8.0 DESCENDANT_OF SPDXRef-simplicity_sdk-2024.12.1-cmsis_core
+
+## Package Information
+PackageName: Interrupt Manager
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-interrupt_manager
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-interrupt_manager CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Enumerations
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-enum
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-enum CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: CORE
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_core
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_core CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Interrupt Manager Cortex-M
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-interrupt_manager_cortexm
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-interrupt_manager_cortexm CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Library Features, Core
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_util_features
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: MSLA
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_util_features CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: PRS
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-emlib_prs
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-emlib_prs CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: System Init
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-sl_system_init
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-sl_system_init CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Clock Manager Runtime
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-clock_manager_runtime
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-clock_manager_runtime CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Code Classification
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-code_classification
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-code_classification CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Common Functions
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-sl_common
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-sl_common CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Utility, Callbacks
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_util_callbacks
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_util_callbacks CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: RAIL Utility, RSSI
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-rail_util_rssi
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-rail_util_rssi CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: Status Codes Definitions
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-status
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-status CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1
+
+## Package Information
+PackageName: GPIO Driver
+SPDXID: SPDXRef-simplicity_sdk-2024.12.1-gpio
+PackageVersion: 2024.12.1
+PrimaryPackagePurpose: LIBRARY
+PackageDownloadLocation: NOASSERTION
+PackageSupplier: Organization: Silicon Laboratories, Inc.
+PackageLicenseConcluded: Zlib
+## Relationships
+Relationship: SPDXRef-simplicity_sdk-2024.12.1-gpio CONTAINED_BY SPDXRef-simplicity_sdk-2024.12.1

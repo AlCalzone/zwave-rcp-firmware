@@ -1,0 +1,8 @@
+################ Silabs files to ignore #####################
+# Ignore the Build Directory entirely
+GNU*
+# Other SSv5 files to ignore
+.trash
+.uceditor
+.projectlinkstore
+*.bak
