@@ -33,6 +33,7 @@
 // -----------------------------------------------------------------------------
 #include "sl_rail_util_init.h"
 #include "rail.h"
+#include "rail_zwave.h"
 
 #include <em_eusart.h>
 #include <em_gpio.h>
@@ -53,16 +54,22 @@
 // -----------------------------------------------------------------------------
 //                                Global Variables
 // -----------------------------------------------------------------------------
-extern uint8_t UART_RX_FIFO[UART_RX_FIFO_SIZE];
-extern uint8_t UART_TX_FIFO[UART_TX_FIFO_SIZE];
-extern uint32_t uart_rx_pos;
-extern uint32_t uart_tx_pos;
-extern uint32_t uart_tx_len;
-extern bool uart_rx_done;
-extern bool uart_tx_done;
+// RX channel hopping
+#define CHANNEL_HOPPING_NUMBER_OF_CHANNELS RAIL_NUM_ZWAVE_CHANNELS
+// The documentation explains some complicated formula to calculate the buffer size,
+// but using that buffer size results in error 0x21 (RAIL_STATUS_INVALID_PARAMETER).
+// It seems that RAIL wants a size of 1050
+#define CHANNEL_HOPPING_BUFFER_SIZE 1050
 
-extern uint8_t RAIL_RX_FIFO[RAIL_FIFO_SIZE];
-extern uint8_t RAIL_TX_FIFO[RAIL_FIFO_SIZE];
+RAIL_RxChannelHoppingConfigEntry_t channelHoppingEntries[CHANNEL_HOPPING_NUMBER_OF_CHANNELS];
+uint32_t channelHoppingBuffer[CHANNEL_HOPPING_BUFFER_SIZE];
+
+RAIL_RxChannelHoppingConfig_t channelHoppingConfig = {
+  .buffer = channelHoppingBuffer,
+  .bufferLength = CHANNEL_HOPPING_BUFFER_SIZE,
+  .numberOfChannels = CHANNEL_HOPPING_NUMBER_OF_CHANNELS,
+  .entries = channelHoppingEntries
+};
 
 // -----------------------------------------------------------------------------
 //                                Static Variables
@@ -95,7 +102,7 @@ RAIL_Handle_t app_init(void)
   // Get RAIL handle, used later by the application
   RAIL_Handle_t rail_handle = sl_rail_util_get_handle(SL_RAIL_UTIL_HANDLE_INST0);
   set_up_tx_fifo(rail_handle);
-  init_channel_hopping(rail_handle);
+  init_rx_channel_hopping(rail_handle);
 
   return rail_handle;
 }
@@ -132,59 +139,26 @@ void initEUSART0(void)
   NVIC_EnableIRQ(EUSART0_TX_IRQn);
 }
 
-/**************************************************************************//**
- * @brief
- *    The EUSART0 receive interrupt saves incoming characters.
- *****************************************************************************/
-void EUSART0_RX_IRQHandler(void)
-{
-  // Get the character just received
-  uint8_t byte = EUSART0->RXDATA;
-  if (uart_rx_pos < UART_RX_FIFO_SIZE) {
-    UART_RX_FIFO[uart_rx_pos++] = byte;
+void init_rx_channel_hopping(RAIL_Handle_t rail_handle) {
+  // Force the radio into idle mode
+  RAIL_Status_t status = RAIL_Idle(rail_handle, RAIL_IDLE_ABORT, false);
+  if (status != RAIL_STATUS_NO_ERROR) {
+    uint16_t buf[1] = {status};
+    uart_transmit((uint8_t*) buf, 2);
   }
 
-  // When the command is complete or the buffer is full, handle the command
-  if (byte == '\r' || uart_rx_pos == UART_RX_FIFO_SIZE) {
-    uart_rx_done = true;
+  // Populate the channel hopping settings for Z-Wave
+  status = RAIL_ZWAVE_ConfigRxChannelHopping(rail_handle, &channelHoppingConfig);
+  if (status != RAIL_STATUS_NO_ERROR) {
+    // app_log_error("RAIL_ZWAVE_ConfigRxChannelHopping() failed with status %d\n", status);
+      uint16_t buf[1] = {status};
+      uart_transmit((uint8_t*) buf, 2);
   }
 
-  /*
-   * The EUSART differs from the USART in that explicit clearing of
-   * RX interrupt flags is required even after emptying the RX FIFO.
-   */
-  EUSART_IntClear(EUSART0, EUSART_IF_RXFL);
-}
-
-/**************************************************************************//**
- * @brief
- *    The EUSART0 transmit interrupt outputs characters.
- *****************************************************************************/
-void EUSART0_TX_IRQHandler(void)
-{
-  // Send a previously queued character
-  if (uart_tx_pos < uart_tx_len)
-  {
-    EUSART0->TXDATA = UART_TX_FIFO[uart_tx_pos++];
-
-    /*
-     * The EUSART differs from the USART in that the TX FIFO interrupt
-     * flag must be explicitly cleared even after a write to the FIFO.
-     */
-    EUSART_IntClear(EUSART0, EUSART_IF_TXFL);
-  }
-  else
-  /*
-   * Need to disable the transmit FIFO level interrupt in this IRQ
-   * handler when done or it will immediately trigger again upon exit
-   * even though there is no data left to send.
-   */
-  {
-    // Done transmitting - reset cursors
-    uart_tx_done = true;
-    uart_tx_pos = 0;
-    uart_tx_len = 0;
-    EUSART_IntDisable(EUSART0, EUSART_IEN_TXFL);
+  status = RAIL_EnableRxChannelHopping(rail_handle, true, true);
+  if (status != RAIL_STATUS_NO_ERROR) {
+    uint16_t buf[1] = {status};
+    uart_transmit((uint8_t*) buf, 2);
   }
 }
 

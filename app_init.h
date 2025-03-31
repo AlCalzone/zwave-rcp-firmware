@@ -60,7 +60,4 @@ RAIL_Handle_t app_init(void);
 void initGPIO(void);
 void initEUSART0(void);
 
-void EUSART0_RX_IRQHandler(void);
-void EUSART0_TX_IRQHandler(void);
-
 #endif  // APP_INIT_H

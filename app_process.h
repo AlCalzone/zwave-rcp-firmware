@@ -34,6 +34,7 @@
 //                                   Includes
 // -----------------------------------------------------------------------------
 #include "rail.h"
+#include "serial_api.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -46,8 +47,6 @@
 // -----------------------------------------------------------------------------
 //                          Public Function Declarations
 // -----------------------------------------------------------------------------
-
-void init_channel_hopping(RAIL_Handle_t rail_handle);
 
 /******************************************************************************
  * Set up the rail TX fifo for later usage
@@ -65,6 +64,18 @@ void set_up_tx_fifo(RAIL_Handle_t rail_handle);
  *****************************************************************************/
 void app_process_action(RAIL_Handle_t rail_handle);
 
-void uart_handle_rx();
+/// @brief Queue raw data for transmission over UART
+void uart_transmit(uint8_t *data, uint32_t len);
+/// @brief Queue a frame for transmission over UART
+void uart_transmit_frame(frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint32_t payload_len);
+/// @brief Queue a single byte for transmission over UART
+void uart_transmit_byte(uint8_t byte);
+
+/// @brief Queue raw data for transmission over radio
+void radio_transmit(uint8_t channel, uint8_t *data, uint32_t len);
+
+// Interrupt handlers for UART
+void EUSART0_RX_IRQHandler(void);
+void EUSART0_TX_IRQHandler(void);
 
 #endif  // APP_PROCESS_H

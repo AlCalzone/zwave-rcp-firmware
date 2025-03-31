@@ -1,41 +1,43 @@
 /******************************************************************************
-* @file
-* @brief app_process.c
-*******************************************************************************
-* # License
-* <b>Copyright 2018 Silicon Laboratories Inc. www.silabs.com</b>
-*******************************************************************************
-*
-* SPDX-License-Identifier: Zlib
-*
-* The licensor of this software is Silicon Laboratories Inc.
-*
-* This software is provided 'as-is', without any express or implied
-* warranty. In no event will the authors be held liable for any damages
-* arising from the use of this software.
-*
-* Permission is granted to anyone to use this software for any purpose,
-* including commercial applications, and to alter it and redistribute it
-* freely, subject to the following restrictions:
-*
-* 1. The origin of this software must not be misrepresented; you must not
-*    claim that you wrote the original software. If you use this software
-*    in a product, an acknowledgment in the product documentation would be
-*    appreciated but is not required.
-* 2. Altered source versions must be plainly marked as such, and must not be
-*    misrepresented as being the original software.
-* 3. This notice may not be removed or altered from any source distribution.
-*
-******************************************************************************/
+ * @file
+ * @brief app_process.c
+ *******************************************************************************
+ * # License
+ * <b>Copyright 2018 Silicon Laboratories Inc. www.silabs.com</b>
+ *******************************************************************************
+ *
+ * SPDX-License-Identifier: Zlib
+ *
+ * The licensor of this software is Silicon Laboratories Inc.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty. In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ *
+ ******************************************************************************/
 
 // -----------------------------------------------------------------------------
 //                                   Includes
 // -----------------------------------------------------------------------------
 #include "sl_component_catalog.h"
+#include <em_eusart.h>
 #include "rail.h"
 #include "rail_zwave.h"
+
 #include "common.h"
-#include <em_eusart.h>
+#include "serial_api.h"
 
 #if defined(SL_CATALOG_KERNEL_PRESENT)
 #include "app_task_init.h"
@@ -61,17 +63,22 @@ static void handle_received_packet(RAIL_Handle_t rail_handle);
 // -----------------------------------------------------------------------------
 rail_state_t rail_state = RAILS_IDLE;
 
+// The received UART data
 uint8_t UART_RX_FIFO[UART_RX_FIFO_SIZE] = {0};
-uint8_t UART_TX_FIFO[UART_TX_FIFO_SIZE] = {0};
+// The position of the write cursor in the RX FIFO
 uint32_t uart_rx_pos = 0;
+
+uint8_t UART_TX_FIFO[UART_TX_FIFO_SIZE] = {0};
 uint32_t uart_tx_pos = 0;
 uint32_t uart_tx_len = 0;
+
+/// Indicates that there is new data to be processed
 bool uart_rx_done = false;
 bool uart_tx_done = false;
 
+static uint8_t tx_channel = 0;
 static uint8_t OUT_PACKET[RAIL_FIFO_SIZE] = {0};
 static uint32_t out_packet_len = 0;
-
 
 // -----------------------------------------------------------------------------
 //                                Static Variables
@@ -86,6 +93,7 @@ static bool rail_packet_received = false;
 
 /// Notify RAIL Tx or Rx error
 static bool rail_error = false;
+static uint8_t tx_error = 0;
 
 /// Request start receiving
 static bool start_rx = true;
@@ -103,48 +111,9 @@ static volatile RAIL_RxPacketHandle_t rx_packet_handle = RAIL_RX_PACKET_HANDLE_I
 static __ALIGNED(RAIL_FIFO_ALIGNMENT) uint8_t rx_fifo[RAIL_FIFO_SIZE];
 static __ALIGNED(RAIL_FIFO_ALIGNMENT) uint8_t tx_fifo[RAIL_FIFO_SIZE];
 
-// RX channel hopping
-#define CHANNEL_HOPPING_NUMBER_OF_CHANNELS RAIL_NUM_ZWAVE_CHANNELS
-// The documentation explains some complicated formula to calculate the buffer size,
-// but using that buffer size results in error 0x21 (RAIL_STATUS_INVALID_PARAMETER).
-// It seems that RAIL wants a size of 1050
-#define CHANNEL_HOPPING_BUFFER_SIZE 1050
-
-RAIL_RxChannelHoppingConfigEntry_t channelHoppingEntries[CHANNEL_HOPPING_NUMBER_OF_CHANNELS];
-uint32_t channelHoppingBuffer[CHANNEL_HOPPING_BUFFER_SIZE];
-
-RAIL_RxChannelHoppingConfig_t channelHoppingConfig = {
-  .buffer = channelHoppingBuffer,
-  .bufferLength = CHANNEL_HOPPING_BUFFER_SIZE,
-  .numberOfChannels = CHANNEL_HOPPING_NUMBER_OF_CHANNELS,
-  .entries = channelHoppingEntries
-};
-
 // -----------------------------------------------------------------------------
 //                          Public Function Definitions
 // -----------------------------------------------------------------------------
-void init_channel_hopping(RAIL_Handle_t rail_handle) {
-  // Force the radio into idle mode
-  RAIL_Status_t status = RAIL_Idle(rail_handle, RAIL_IDLE_ABORT, false);
-  if (status != RAIL_STATUS_NO_ERROR) {
-    uint16_t buf[1] = {status};
-    uart_transmit((uint8_t*) buf, 2);
-  }
-
-  // Populate the channel hopping settings for Z-Wave
-  status = RAIL_ZWAVE_ConfigRxChannelHopping(rail_handle, &channelHoppingConfig);
-  if (status != RAIL_STATUS_NO_ERROR) {
-    // app_log_error("RAIL_ZWAVE_ConfigRxChannelHopping() failed with status %d\n", status);
-      uint16_t buf[1] = {status};
-      uart_transmit((uint8_t*) buf, 2);
-  }
-
-  status = RAIL_EnableRxChannelHopping(rail_handle, true, true);
-  if (status != RAIL_STATUS_NO_ERROR) {
-    uint16_t buf[1] = {status};
-    uart_transmit((uint8_t*) buf, 2);
-  }
-}
 
 /******************************************************************************
  * Set up the rail TX fifo for later usage
@@ -171,110 +140,259 @@ void app_process_action(RAIL_Handle_t rail_handle)
   // Do not call blocking functions from here!                             //
   ///////////////////////////////////////////////////////////////////////////
 
+  // State machine for radio RX/TX
   if (rail_state == RAILS_IDLE)
   {
+    // We're only idle at the start of the program
+    // Start receiving on channel 0. RX channel hopping takes care of the other channels
     RAIL_StartRx(rail_handle, 0, NULL);
     rail_state = RAILS_RX;
   }
   else if (rail_state == RAILS_RX)
   {
+    // RAIL is listening for packets
     if (rail_packet_received)
     {
+      // A complete packet was received, handle it
       rail_packet_received = false;
       handle_received_packet(rail_handle);
-    } else if (out_packet_len > 0) {
-      // Transmit requested
+    }
+    else if (out_packet_len > 0)
+    {
+      // There is a packet in the outgoing buffer, switch to TX state
       rail_state = RAILS_TX;
     }
-  } else if (rail_state = RAILS_TX) {
-    if (out_packet_len > 0) {
+  }
+  else if (rail_state = RAILS_TX)
+  {
+    if (out_packet_len > 0)
+    {
+      // Queue the packet for transmit
       rail_transmit(rail_handle, OUT_PACKET, out_packet_len);
       out_packet_len = 0;
-    } else if (rail_packet_sent) {
+    }
+    else if (rail_packet_sent)
+    {
+      callback_cmd_transmit(TX_RESULT_COMPLETED);
+      // if it was sent, switch back to RX
       rail_packet_sent = false;
-      rail_state = RAILS_IDLE;
-    } else if (rail_error) {
-      // TODO: Handle
-      rail_error = false;
-      rail_state = RAILS_IDLE;
+      // TODO: Notify application that packet was sent
+      rail_state = RAILS_RX;
+    }
+    else if (tx_error != 0)
+    {
+      // FIXME: Figure out what the error is
+      callback_cmd_transmit((tx_result_t) tx_error);
+      // if there was an error, also switch back to RX
+      tx_error = 0;
+      // TODO: Notify application that there was an error
+      rail_state = RAILS_RX;
     }
   }
 
-  if (uart_rx_done) {
+  // Whenever a complete serial frame was received via UART, handle it
+  if (uart_rx_done)
+  {
     uart_rx_done = false;
     uart_handle_rx();
   }
-
-  // if (uart_tx_done) {
-  //   // Reset cursors
-  //   uart_tx_done = false;
-  //   uart_tx_pos = 0;
-  //   uart_tx_len = 0;
-  // }
 }
 
+/// @brief Queue a frame for transmission over UART
 void uart_transmit(uint8_t *data, uint32_t len)
 {
+  // Copy the data onto the TX FIFO
   memcpy(&UART_TX_FIFO[uart_tx_len], data, len);
   uart_tx_len += len;
   uart_tx_done = false;
+  // And enable the TX interrupt that handles the transmission
   EUSART_IntEnable(EUSART0, EUSART_IEN_TXFL);
 }
 
+/// @brief Queue a frame for transmission over UART
+void uart_transmit_frame(frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint32_t payload_len)
+{
+  uint8_t frame_len = payload_len + 3; // length, type, func_id
+  uint8_t frame[frame_len + 2];        // SOF, ...rest, chksum
+  uint8_t chksum = 0xff ^ frame_len ^ frame_type ^ func_id;
+  uint8_t i = 0;
+  frame[i++] = SOF;
+  frame[i++] = frame_len;
+  frame[i++] = frame_type;
+  frame[i++] = func_id;
+  for (int j = 0; j < payload_len; j++)
+  {
+    frame[i++] = payload[j];
+    chksum ^= payload[j];
+  }
+  frame[i++] = chksum;
+
+  uart_transmit(frame, frame_len + 2);
+}
+
+/// @brief Queue a single byte for transmission over UART
+void uart_transmit_byte(uint8_t byte)
+{
+  // Copy the data onto the TX FIFO
+  UART_TX_FIFO[uart_tx_len++] = byte;
+  uart_tx_done = false;
+  // And enable the TX interrupt that handles the transmission
+  EUSART_IntEnable(EUSART0, EUSART_IEN_TXFL);
+}
+
+/// @brief Handle a received frame over UART
 void uart_handle_rx()
 {
-  uint8_t cmd[UART_RX_FIFO_SIZE / 2] = {0};
-  int cmd_len = 0;
-  for (int i = 0; i < uart_rx_pos; i += 2)
+  // Skip all data that does not start with SOF
+  int i = 0;
+  while (
+      // There is something to read
+      i < uart_rx_pos
+      // that is not a SOF
+      && UART_RX_FIFO[i] != SOF)
   {
-    char c = UART_RX_FIFO[i];
-    if (c == '\r')
-    {
-      // End of frame
-      break;
-    }
-
-    if (c >= '0' && c <= '9')
-    {
-      cmd[i / 2] += (c - '0') << 4;
-    }
-    else
-    {
-      cmd[i / 2] += (c - 'a' + 10) << 4;
-    }
-    cmd_len++;
-
-    c = UART_RX_FIFO[i + 1];
-    if (c == '\r')
-    {
-      // End of frame
-      break;
-    }
-
-    if (c >= '0' && c <= '9')
-    {
-      cmd[i / 2] += c - '0';
-    }
-    else
-    {
-      cmd[i / 2] += c - 'a' + 10;
-    }
+    i++;
+  }
+  if (i == uart_rx_pos)
+  {
+    // No SOF found
+    reset_rx_fifo(i);
+    return;
   }
 
-  // After receiving a complete frame, reset the read position
+  // We need at least 5 bytes to process a frame
+  uint8_t remaining = uart_rx_pos - i;
+  if (remaining < 5)
+  {
+    // Not enough data to process a frame
+    return;
+  }
+
+  uint8_t chksum = 0xff;
+  // Skip SOF
+  i++;
+
+  // Check the length of the frame, not including SOF and checksum
+  uint8_t len = UART_RX_FIFO[i++];
+  chksum ^= len;
+
+  remaining = uart_rx_pos - i;
+  if (remaining < len)
+  {
+    // Not enough data to process a frame
+    return;
+  }
+
+  // Extract frame and update checksum
+  uint8_t cmd[len - 1];
+  for (int j = 0; j < len - 1; j++)
+  {
+    cmd[j] = UART_RX_FIFO[i++];
+    chksum ^= cmd[j];
+  }
+
+  // Compare with actual checksum. chksum should now be 0 if it matches
+  chksum ^= UART_RX_FIFO[i++];
+
+  // Move remaining data to start of buffer
+  // FIXME: Use a ringbuffer so we can avoid this
+  if (i < uart_rx_pos)
+  {
+    reset_rx_fifo(i);
+    // There is still data left to handle
+    uart_rx_done = false;
+  }
   uart_rx_pos = 0;
 
-  memcpy(OUT_PACKET, cmd, cmd_len);
-  out_packet_len = cmd_len;
+  if (chksum == 0)
+  {
+    // Checksum valid
+    uart_transmit_byte(ACK);
+    uart_handle_frame(cmd[0], cmd[1], &cmd[2], len - 3);
+  }
+  else
+  {
+    // Try to re-sync
+    uart_transmit_byte(NAK);
+  }
+}
+
+void reset_rx_fifo(uint8_t new_start)
+{
+  if (new_start < uart_rx_pos)
+  {
+    memmove(UART_RX_FIFO, &UART_RX_FIFO[new_start], uart_rx_pos - new_start);
+  }
+  uart_rx_pos = 0;
+}
+
+void uart_handle_frame(frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint8_t len)
+{
+  if (frame_type != FRAME_TYPE_REQ)
+  {
+    // We only handle requests
+    return;
+  }
+
+  // Process the frame
+  switch (func_id)
+  {
+  case FUNC_ID_GET_FIRMWARE_INFO:
+    handle_cmd_get_firmware_info(payload, len);
+    break;
+
+  case FUNC_ID_TRANSMIT:
+    handle_cmd_transmit(payload, len);
+    break;
+  default:
+    // Unknown command
+    break;
+  }
+}
+
+void radio_transmit(uint8_t channel, uint8_t *data, uint32_t len)
+{
+  if (out_packet_len > 0)
+  {
+    // There is already a packet in the buffer
+    respond_cmd_transmit(TX_RESULT_BUSY);
+    return;
+  }
+  if (len > RAIL_FIFO_SIZE)
+  {
+    // The packet is too large
+    respond_cmd_transmit(TX_RESULT_OVERFLOW);
+    return;
+  }
+  if (channel >= RAIL_NUM_ZWAVE_CHANNELS) {
+    // FIXME: Dynamically figure out the number of channels based on the current region
+    // Invalid channel
+    respond_cmd_transmit(TX_RESULT_INVALID_CHANNEL);
+    return;
+  }
+
+  // Queue the packet. The response will be handled by `rail_transmit()`
+  tx_channel = channel;
+  memcpy(OUT_PACKET, data, len);
+  out_packet_len = len;
 }
 
 void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len)
 {
   RAIL_WriteTxFifo(rail_handle, data, len, true);
-  RAIL_Status_t rail_status = RAIL_StartTx(rail_handle, 0, RAIL_TX_OPTION_WAIT_FOR_ACK, NULL);
-  if (rail_status != RAIL_STATUS_NO_ERROR)
+  RAIL_Status_t rail_status = RAIL_StartTx(rail_handle, tx_channel, RAIL_TX_OPTIONS_DEFAULT, NULL);
+  if (rail_status == RAIL_STATUS_NO_ERROR)
   {
-    // app_log_warning("RAIL_StartTx() result: %lu\n ", rail_status);
+    respond_cmd_transmit(TX_RESULT_QUEUED);
+  }
+  else if (rail_status == RAIL_STATUS_INVALID_PARAMETER)
+  {
+    respond_cmd_transmit(TX_RESULT_INVALID_PARAM);
+  }
+  else
+  {
+    // TODO: Figure out oother possible errors and expose them
+    respond_cmd_transmit(TX_RESULT_UNKNOWN_ERROR);
   }
 }
 
@@ -293,9 +411,25 @@ void sl_rail_util_on_event(RAIL_Handle_t rail_handle, RAIL_Events_t events)
     {
       rail_packet_sent = true;
     }
+    else if (events & RAIL_EVENT_TX_ABORTED)
+    {
+      tx_error = TX_RESULT_ABORTED;
+    }
+    else if (events & RAIL_EVENT_TX_BLOCKED)
+    {
+      tx_error = TX_RESULT_BLOCKED;
+    }
+    else if (events & RAIL_EVENT_TX_UNDERFLOW)
+    {
+      tx_error = TX_RESULT_UNDERFLOW;
+    }
+    else if (events & RAIL_EVENT_TX_CHANNEL_BUSY)
+    {
+      tx_error = TX_RESULT_CHANNEL_BUSY;
+    }
     else
     {
-      rail_error = true;
+      tx_error = TX_RESULT_UNKNOWN_ERROR;
     }
   }
 
@@ -331,6 +465,64 @@ void sl_rail_util_on_event(RAIL_Handle_t rail_handle, RAIL_Events_t events)
 // -----------------------------------------------------------------------------
 //                          Static Function Definitions
 // -----------------------------------------------------------------------------
+
+/**************************************************************************/ /**
+                                                                              * @brief
+                                                                              *    The EUSART0 receive interrupt saves incoming characters.
+                                                                              *****************************************************************************/
+void EUSART0_RX_IRQHandler(void)
+{
+  // Get the character just received
+  uint8_t byte = EUSART0->RXDATA;
+  UART_RX_FIFO[uart_rx_pos++] = byte;
+  // Wrap around after reaching the end of the buffer
+  if (uart_rx_pos == UART_RX_FIFO_SIZE)
+  {
+    // FIXME: We should use a ringbuffer
+    uart_rx_pos = 0;
+  }
+
+  // Signal that there is something to process
+  uart_rx_done = true;
+
+  /*
+   * The EUSART differs from the USART in that explicit clearing of
+   * RX interrupt flags is required even after emptying the RX FIFO.
+   */
+  EUSART_IntClear(EUSART0, EUSART_IF_RXFL);
+}
+
+/**************************************************************************/ /**
+                                                                              * @brief
+                                                                              *    The EUSART0 transmit interrupt outputs characters.
+                                                                              *****************************************************************************/
+void EUSART0_TX_IRQHandler(void)
+{
+  // Send a previously queued character
+  if (uart_tx_pos < uart_tx_len)
+  {
+    EUSART0->TXDATA = UART_TX_FIFO[uart_tx_pos++];
+
+    /*
+     * The EUSART differs from the USART in that the TX FIFO interrupt
+     * flag must be explicitly cleared even after a write to the FIFO.
+     */
+    EUSART_IntClear(EUSART0, EUSART_IF_TXFL);
+  }
+  else
+  /*
+   * Need to disable the transmit FIFO level interrupt in this IRQ
+   * handler when done or it will immediately trigger again upon exit
+   * even though there is no data left to send.
+   */
+  {
+    // Done transmitting - reset cursors
+    uart_tx_done = true;
+    uart_tx_pos = 0;
+    uart_tx_len = 0;
+    EUSART_IntDisable(EUSART0, EUSART_IEN_TXFL);
+  }
+}
 
 /*******************************************************************************
  * Process the received packet (print data packet or indicate ACK)
@@ -369,31 +561,8 @@ static void handle_received_packet(RAIL_Handle_t rail_handle)
     uint16_t packet_size = packet_info.packetBytes;
     RAIL_CopyRxPacket(rx_fifo, &packet_info);
 
-    uint8_t hex[UART_RX_FIFO_SIZE] = {0};
-    for (int i = 0; i < packet_size; i++)
-    {
-      uint8_t nibble = rx_fifo[i] >> 4;
-      if (nibble < 10)
-      {
-        hex[i * 2] = '0' + nibble;
-      }
-      else
-      {
-        hex[i * 2] = 'a' + (nibble - 10);
-      }
-
-      nibble = rx_fifo[i] & 0xF;
-      if (nibble < 10)
-      {
-        hex[i * 2 + 1] = '0' + nibble;
-      }
-      else
-      {
-        hex[i * 2 + 1] = 'a' + (nibble - 10);
-      }
-    }
-    hex[packet_size * 2] = '\n';
-    uart_transmit(hex, packet_size * 2 + 1);
+    // FIXME: Include info about the received package (RSSI etc.)
+    notify_receive(rx_fifo, (uint8_t)packet_size);
 
     rail_status = RAIL_ReleaseRxPacket(rail_handle, rx_packet_handle);
     if (rail_status != RAIL_STATUS_NO_ERROR)
