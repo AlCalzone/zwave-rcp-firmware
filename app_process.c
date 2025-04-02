@@ -182,7 +182,7 @@ void app_process_action(RAIL_Handle_t rail_handle)
     else if (tx_error != 0)
     {
       // FIXME: Figure out what the error is
-      callback_cmd_transmit((tx_result_t) tx_error);
+      callback_cmd_transmit((tx_result_t)tx_error);
       // if there was an error, also switch back to RX
       tx_error = 0;
       // TODO: Notify application that there was an error
@@ -194,7 +194,7 @@ void app_process_action(RAIL_Handle_t rail_handle)
   if (uart_rx_done)
   {
     uart_rx_done = false;
-    uart_handle_rx();
+    uart_handle_rx(rail_handle);
   }
 }
 
@@ -241,7 +241,7 @@ void uart_transmit_byte(uint8_t byte)
 }
 
 /// @brief Handle a received frame over UART
-void uart_handle_rx()
+void uart_handle_rx(RAIL_Handle_t rail_handle)
 {
   // Skip all data that does not start with SOF
   int i = 0;
@@ -308,7 +308,7 @@ void uart_handle_rx()
   {
     // Checksum valid
     uart_transmit_byte(ACK);
-    uart_handle_frame(cmd[0], cmd[1], &cmd[2], len - 3);
+    uart_handle_frame(rail_handle, cmd[0], cmd[1], &cmd[2], len - 3);
   }
   else
   {
@@ -326,7 +326,7 @@ void reset_rx_fifo(uint8_t new_start)
   uart_rx_pos = 0;
 }
 
-void uart_handle_frame(frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint8_t len)
+void uart_handle_frame(RAIL_Handle_t rail_handle, frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint8_t len)
 {
   if (frame_type != FRAME_TYPE_REQ)
   {
@@ -341,12 +341,201 @@ void uart_handle_frame(frame_type_t frame_type, func_id_t func_id, uint8_t *payl
     handle_cmd_get_firmware_info(payload, len);
     break;
 
+  case FUNC_ID_SETUP_RADIO:
+    handle_cmd_setup_radio(rail_handle, payload, len);
+    break;
+
   case FUNC_ID_TRANSMIT:
     handle_cmd_transmit(payload, len);
     break;
   default:
     // Unknown command
     break;
+  }
+}
+
+bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_channel_cfg_t channel_cfg, uint8_t *num_channels, channel_info_t *channels)
+{
+  const RAIL_ZWAVE_RegionConfig_t *region_config;
+
+  switch (region)
+  {
+  case REGION_EU:
+    region_config = &RAIL_ZWAVE_REGION_EU;
+    break;
+  case REGION_US:
+    region_config = &RAIL_ZWAVE_REGION_US;
+    break;
+  case REGION_ANZ:
+    region_config = &RAIL_ZWAVE_REGION_ANZ;
+    break;
+  case REGION_HK:
+    region_config = &RAIL_ZWAVE_REGION_HK;
+    break;
+  case REGION_IN:
+    region_config = &RAIL_ZWAVE_REGION_IN;
+    break;
+  case REGION_IL:
+    region_config = &RAIL_ZWAVE_REGION_IL;
+    break;
+  case REGION_RU:
+    region_config = &RAIL_ZWAVE_REGION_RU;
+    break;
+  case REGION_CN:
+    region_config = &RAIL_ZWAVE_REGION_CN;
+    break;
+  case REGION_JP:
+    region_config = &RAIL_ZWAVE_REGION_JP;
+    break;
+  case REGION_KR:
+    region_config = &RAIL_ZWAVE_REGION_KR;
+    break;
+
+    // For LR regions, the actual configuration depends on the channel configuration
+    // which is ignored for the non-LR regions
+  case REGION_US_LR:
+    switch (channel_cfg)
+    {
+    case CHANNEL_CFG_CLASSIC_LR_A:
+      region_config = &RAIL_ZWAVE_REGION_US_LR1;
+      break;
+    case CHANNEL_CFG_CLASSIC_LR_B:
+      region_config = &RAIL_ZWAVE_REGION_US_LR2;
+      break;
+    case CHANNEL_CFG_LR:
+      region_config = &RAIL_ZWAVE_REGION_US_LR3;
+      break;
+    default:
+      return false;
+    }
+  case REGION_EU_LR:
+    switch (channel_cfg)
+    {
+    case CHANNEL_CFG_CLASSIC_LR_A:
+      region_config = &RAIL_ZWAVE_REGION_EU_LR1;
+      break;
+    case CHANNEL_CFG_CLASSIC_LR_B:
+      region_config = &RAIL_ZWAVE_REGION_EU_LR2;
+      break;
+    case CHANNEL_CFG_LR:
+      region_config = &RAIL_ZWAVE_REGION_EU_LR3;
+      break;
+    default:
+      return false;
+    }
+
+  default:
+    return false;
+  }
+
+  RAIL_Status_t status = RAIL_ZWAVE_ConfigRegion(rail_handle, region_config);
+  if (status != RAIL_STATUS_NO_ERROR)
+  {
+    return false;
+  }
+
+  // Expose the channel information to the host
+  export_channel_info(region_config, num_channels, channels);
+  return true;
+}
+
+void radio_get_region(RAIL_Handle_t rail_handle, zwave_region_t *region, zwave_channel_cfg_t *channel_cfg, uint8_t *num_channels, channel_info_t *channels)
+{
+  RAIL_ZWAVE_RegionId_t rail_region = RAIL_ZWAVE_GetRegion(rail_handle);
+  const RAIL_ZWAVE_RegionConfig_t *region_config;
+
+  switch (rail_region)
+  {
+  case RAIL_ZWAVE_REGIONID_EU:
+    *region = REGION_EU;
+    region_config = &RAIL_ZWAVE_REGION_EU;
+    break;
+  case RAIL_ZWAVE_REGIONID_US:
+    *region = REGION_US;
+    region_config = &RAIL_ZWAVE_REGION_US;
+    break;
+  case RAIL_ZWAVE_REGIONID_ANZ:
+    *region = REGION_ANZ;
+    region_config = &RAIL_ZWAVE_REGION_ANZ;
+    break;
+  case RAIL_ZWAVE_REGIONID_HK:
+    *region = REGION_HK;
+    region_config = &RAIL_ZWAVE_REGION_HK;
+    break;
+  case RAIL_ZWAVE_REGIONID_IN:
+    *region = REGION_IN;
+    region_config = &RAIL_ZWAVE_REGION_IN;
+    break;
+  case RAIL_ZWAVE_REGIONID_JP:
+    *region = REGION_JP;
+    region_config = &RAIL_ZWAVE_REGION_JP;
+    break;
+  case RAIL_ZWAVE_REGIONID_RU:
+    *region = REGION_RU;
+    region_config = &RAIL_ZWAVE_REGION_RU;
+    break;
+  case RAIL_ZWAVE_REGIONID_IL:
+    *region = REGION_IL;
+    region_config = &RAIL_ZWAVE_REGION_IL;
+    break;
+  case RAIL_ZWAVE_REGIONID_KR:
+    *region = REGION_KR;
+    region_config = &RAIL_ZWAVE_REGION_KR;
+    break;
+  case RAIL_ZWAVE_REGIONID_CN:
+    *region = REGION_CN;
+    region_config = &RAIL_ZWAVE_REGION_CN;
+    break;
+  case RAIL_ZWAVE_REGIONID_US_LR1:
+    *region = REGION_US_LR;
+    *channel_cfg = CHANNEL_CFG_CLASSIC_LR_A;
+    region_config = &RAIL_ZWAVE_REGION_US_LR1;
+    break;
+  case RAIL_ZWAVE_REGIONID_US_LR2:
+    *region = REGION_US_LR;
+    *channel_cfg = CHANNEL_CFG_CLASSIC_LR_B;
+    region_config = &RAIL_ZWAVE_REGION_US_LR2;
+    break;
+  case RAIL_ZWAVE_REGIONID_US_LR3:
+    *region = REGION_US_LR;
+    *channel_cfg = CHANNEL_CFG_LR;
+    region_config = &RAIL_ZWAVE_REGION_US_LR3;
+    break;
+  case RAIL_ZWAVE_REGIONID_EU_LR1:
+    *region = REGION_EU_LR;
+    *channel_cfg = CHANNEL_CFG_CLASSIC_LR_A;
+    region_config = &RAIL_ZWAVE_REGION_EU_LR1;
+    break;
+  case RAIL_ZWAVE_REGIONID_EU_LR2:
+    *region = REGION_EU_LR;
+    *channel_cfg = CHANNEL_CFG_CLASSIC_LR_B;
+    region_config = &RAIL_ZWAVE_REGION_EU_LR2;
+    break;
+  case RAIL_ZWAVE_REGIONID_EU_LR3:
+    *region = REGION_EU_LR;
+    *channel_cfg = CHANNEL_CFG_LR;
+    region_config = &RAIL_ZWAVE_REGION_EU_LR3;
+    break;
+  default:
+    *region = REGION_UNKNOWN;
+    return;
+  }
+
+  // Expose the channel information to the host
+  export_channel_info(region_config, num_channels, channels);
+}
+
+void export_channel_info(RAIL_ZWAVE_RegionConfig_t *region_config, uint8_t *num_channels, channel_info_t *channels)
+{
+  for (int i = 0; i < RAIL_NUM_ZWAVE_CHANNELS; i++)
+  {
+    if (region_config->frequency[i] == 0xffffffff)
+    {
+      break;
+    }
+    channels[i].freq = region_config->frequency[i];
+    channels[i].baud = region_config->baudRate[i];
+    (*num_channels)++;
   }
 }
 
@@ -364,7 +553,8 @@ void radio_transmit(uint8_t channel, uint8_t *data, uint32_t len)
     respond_cmd_transmit(TX_RESULT_OVERFLOW);
     return;
   }
-  if (channel >= RAIL_NUM_ZWAVE_CHANNELS) {
+  if (channel >= RAIL_NUM_ZWAVE_CHANNELS)
+  {
     // FIXME: Dynamically figure out the number of channels based on the current region
     // Invalid channel
     respond_cmd_transmit(TX_RESULT_INVALID_CHANNEL);
@@ -562,7 +752,7 @@ static void handle_received_packet(RAIL_Handle_t rail_handle)
     RAIL_CopyRxPacket(rx_fifo, &packet_info);
 
     // FIXME: Include info about the received package (RSSI etc.)
-    notify_receive(rx_fifo, (uint8_t)packet_size);
+    notify_receive(rx_fifo, (uint8_t)packet_size, packet_details.rssi, packet_details.lqi, (uint8_t)packet_details.channel & 0xff);
 
     rail_status = RAIL_ReleaseRxPacket(rail_handle, rx_packet_handle);
     if (rail_status != RAIL_STATUS_NO_ERROR)

@@ -2,6 +2,7 @@
 #define SERIAL_API_H
 
 #include <stdint.h>
+#include "rail.h"
 
 #define SOF 0x01
 #define ACK 0x06
@@ -25,12 +26,10 @@ typedef enum
 	FRAME_TYPE_CALLBACK = 0x02,
 } frame_type_t;
 
-void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len);
-
 typedef enum
 {
-	FW_TYPE_RCP = 0x01,
-} firmware_type_t;
+  RADIO_LIBRARY_RAIL,
+} radio_library_t;
 
 typedef enum
 {
@@ -56,10 +55,54 @@ typedef enum
 	TX_RESULT_COMPLETED = 0xff,
 } tx_result_t;
 
+typedef enum {
+	SETUP_RADIO_CMD_SET_REGION = 0x01,
+	SETUP_RADIO_CMD_GET_REGION = 0x02,
+} setup_radio_cmd_t;
+
+typedef enum {
+	REGION_EU = 0,
+	REGION_US,
+	REGION_ANZ,
+	REGION_HK,
+	REGION_IN = 5,
+	REGION_IL,
+	REGION_RU,
+	REGION_CN,
+	REGION_US_LR,
+	REGION_EU_LR = 11,
+	REGION_JP = 32,
+	REGION_KR,
+	REGION_UNKNOWN = 0xfe,
+} zwave_region_t;
+
+typedef enum {
+	CHANNEL_CFG_CLASSIC = 0,
+	CHANNEL_CFG_CLASSIC_LR_A = 1,
+	CHANNEL_CFG_CLASSIC_LR_B = 2,
+	CHANNEL_CFG_LR = 3,
+} zwave_channel_cfg_t;
+
+typedef enum {
+	ZWAVE_BAUD_9k6 = 0,
+	ZWAVE_BAUD_40k = 1,
+	ZWAVE_BAUD_100k = 2,
+	ZWAVE_BAUD_LR100k = 3,
+} zwave_baudrate_t;
+
+typedef struct {
+	uint32_t freq;
+	zwave_baudrate_t baud;
+} channel_info_t;
+
+void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len);
+
+void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len);
+
 void handle_cmd_transmit(uint8_t *payload, uint8_t len);
 void respond_cmd_transmit(tx_result_t result);
 void callback_cmd_transmit(tx_result_t result);
 
-void notify_receive(uint8_t *data, uint8_t len);
+void notify_receive(uint8_t *data, uint8_t len, int8_t rssi, uint8_t lqi, uint8_t channel);
 
 #endif

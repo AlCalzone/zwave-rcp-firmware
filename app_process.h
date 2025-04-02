@@ -73,6 +73,10 @@ void uart_transmit_byte(uint8_t byte);
 
 /// @brief Queue raw data for transmission over radio
 void radio_transmit(uint8_t channel, uint8_t *data, uint32_t len);
+/// @brief Change the region of the radio
+bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_channel_cfg_t channel_cfg, uint8_t* num_channels, channel_info_t* channels);
+/// @brief Read the region of the radio and its information
+void radio_get_region(RAIL_Handle_t rail_handle, zwave_region_t* region, zwave_channel_cfg_t* channel_cfg, uint8_t* num_channels, channel_info_t* channels);
 
 // Interrupt handlers for UART
 void EUSART0_RX_IRQHandler(void);
