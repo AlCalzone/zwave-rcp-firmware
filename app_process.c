@@ -621,6 +621,11 @@ void sl_rail_util_on_event(RAIL_Handle_t rail_handle, RAIL_Events_t events)
     {
       tx_error = TX_RESULT_UNKNOWN_ERROR;
     }
+    // Documentation indicates that it does nothing for single protocol,
+    // but without it, we've frequently missed receiving ACKs that other radios
+    // are picking up.
+    // I've also seen it in Z-Wave controller binaries. So this seems to be required.
+    RAIL_YieldRadio(rail_handle);
   }
 
   // Handle Rx events
