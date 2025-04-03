@@ -54,7 +54,7 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 		if (result)
 		{
 			uint8_t resp[3 + num_channels * 5];
-			resp[0] = SETUP_RADIO_CMD_SET_REGION;
+			resp[0] = subcmd;
 			resp[1] = 1;
 			resp[2] = num_channels;
 			int i = 3;
@@ -70,7 +70,7 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 		}
 		else
 		{
-			uint8_t resp[2] = {SETUP_RADIO_CMD_SET_REGION, 0};
+			uint8_t resp[2] = {subcmd, 0};
 			uart_transmit_frame(FRAME_TYPE_RESP, FUNC_ID_SETUP_RADIO, resp, sizeof(resp));
 		}
 		break;
@@ -87,7 +87,7 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 		radio_get_region(rail_handle, &region, &channel_cfg, &num_channels, channels);
 
 		uint8_t resp[4 + num_channels * 5];
-		resp[0] = SETUP_RADIO_CMD_SET_REGION;
+		resp[0] = subcmd;
 		resp[1] = region;
 		resp[2] = channel_cfg;
 		resp[3] = num_channels;
