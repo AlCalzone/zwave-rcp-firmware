@@ -300,7 +300,7 @@ void uart_handle_rx(RAIL_Handle_t rail_handle)
   {
     reset_rx_fifo(i);
     // There is still data left to handle
-    uart_rx_done = false;
+    uart_rx_done = true;
   }
   uart_rx_pos = 0;
 
