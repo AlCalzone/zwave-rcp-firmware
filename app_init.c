@@ -120,6 +120,9 @@ void initEUSART0(void)
   // Default asynchronous initializer (115.2 Kbps, 8N1, no flow control)
   EUSART_UartInit_TypeDef init = EUSART_UART_INIT_DEFAULT_HF;
 
+  // Bump baudrate to 460.8 kbps
+  init.baudrate = 460800;
+
   // Route EUSART0 TX and RX to the board controller TX and RX pins
   GPIO->EUSARTROUTE[0].TXROUTE = (EUSART0_TX_PORT << _GPIO_EUSART_TXROUTE_PORT_SHIFT)
       | (EUSART0_TX_PIN << _GPIO_EUSART_TXROUTE_PIN_SHIFT);
