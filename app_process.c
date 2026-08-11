@@ -38,6 +38,8 @@
 
 #include "common.h"
 #include "serial_api.h"
+#include "app_init.h"
+#include "app_process.h"
 
 #if defined(SL_CATALOG_KERNEL_PRESENT)
 #include "app_task_init.h"
@@ -438,13 +440,14 @@ bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_ch
     return false;
   }
 
+  radio_sync_active_region(rail_handle);
+
   // Expose the channel information to the host
   export_channel_info(region_config, num_channels, channels);
-  region_num_channels = *num_channels;
   return true;
 }
 
-void radio_get_region(RAIL_Handle_t rail_handle, zwave_region_t *region, zwave_channel_cfg_t *channel_cfg, uint8_t *num_channels, channel_info_t *channels)
+static const RAIL_ZWAVE_RegionConfig_t *resolve_active_region(RAIL_Handle_t rail_handle, zwave_region_t *region, zwave_channel_cfg_t *channel_cfg)
 {
   RAIL_ZWAVE_RegionId_t rail_region = RAIL_ZWAVE_GetRegion(rail_handle);
   const RAIL_ZWAVE_RegionConfig_t *region_config;
@@ -523,11 +526,44 @@ void radio_get_region(RAIL_Handle_t rail_handle, zwave_region_t *region, zwave_c
     break;
   default:
     *region = REGION_UNKNOWN;
+    return NULL;
+  }
+
+  return region_config;
+}
+
+void radio_get_region(RAIL_Handle_t rail_handle, zwave_region_t *region, zwave_channel_cfg_t *channel_cfg, uint8_t *num_channels, channel_info_t *channels)
+{
+  const RAIL_ZWAVE_RegionConfig_t *region_config = resolve_active_region(rail_handle, region, channel_cfg);
+  if (region_config == NULL)
+  {
     return;
   }
 
   // Expose the channel information to the host
   export_channel_info(region_config, num_channels, channels);
+}
+
+void radio_sync_active_region(RAIL_Handle_t rail_handle)
+{
+  zwave_region_t region;
+  zwave_channel_cfg_t channel_cfg;
+  const RAIL_ZWAVE_RegionConfig_t *region_config = resolve_active_region(rail_handle, &region, &channel_cfg);
+  if (region_config == NULL)
+  {
+    region_num_channels = 0;
+    return;
+  }
+
+  channel_info_t channels[RAIL_NUM_ZWAVE_CHANNELS] = {0};
+  region_num_channels = 0;
+  export_channel_info(region_config, &region_num_channels, channels);
+
+  // Dwell times and the number of hopped channels differ per region
+  init_rx_channel_hopping(rail_handle, region_num_channels);
+
+  // Configuring hopping idles the radio, so return to the state that starts RX
+  rail_state = RAILS_IDLE;
 }
 
 void export_channel_info(RAIL_ZWAVE_RegionConfig_t *region_config, uint8_t *num_channels, channel_info_t *channels)
