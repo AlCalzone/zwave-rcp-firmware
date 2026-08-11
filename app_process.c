@@ -79,6 +79,8 @@ bool uart_rx_done = false;
 bool uart_tx_done = false;
 
 static uint8_t tx_channel = 0;
+static int8_t tx_power_dbm = 0;
+static uint8_t tx_flags = 0;
 /// Number of channels the currently configured region has
 static uint8_t region_num_channels = 0;
 static uint8_t OUT_PACKET[RAIL_FIFO_SIZE] = {0};
@@ -110,6 +112,21 @@ static volatile RAIL_Status_t calibration_status = 0;
 
 /// RAIL Rx packet handle
 static volatile RAIL_RxPacketHandle_t rx_packet_handle = RAIL_RX_PACKET_HANDLE_INVALID;
+
+/// LBT parameters for transmits that request CCA. A single check with no
+/// backoff, so the host stays in charge of the retry policy.
+/// The threshold follows G.9959 §7.1.2.5.4: "The PHY shall be able to perform
+/// a CCA with a threshold of –80 dBm"
+static const RAIL_LbtConfig_t lbt_config = {
+    .lbtMinBoRand = 0,
+    .lbtMaxBoRand = 0,
+    .lbtTries = 1,
+    .lbtThreshold = -80,
+    .lbtBackoff = 0,
+    // 1 ms spans several bit periods at the slowest Z-Wave rate of 9.6 kbps
+    .lbtDuration = 1000,
+    .lbtTimeout = 0,
+};
 
 /// Receive and Send FIFO
 static __ALIGNED(RAIL_FIFO_ALIGNMENT) uint8_t rx_fifo[RAIL_FIFO_SIZE];
@@ -580,7 +597,7 @@ void export_channel_info(RAIL_ZWAVE_RegionConfig_t *region_config, uint8_t *num_
   }
 }
 
-void radio_transmit(uint8_t channel, uint8_t *data, uint32_t len)
+void radio_transmit(uint8_t channel, int8_t power_dbm, uint8_t flags, uint8_t *data, uint32_t len)
 {
   if (out_packet_len > 0)
   {
@@ -603,6 +620,8 @@ void radio_transmit(uint8_t channel, uint8_t *data, uint32_t len)
 
   // Queue the packet. The response will be handled by `rail_transmit()`
   tx_channel = channel;
+  tx_power_dbm = power_dbm;
+  tx_flags = flags;
   memcpy(OUT_PACKET, data, len);
   out_packet_len = len;
 }
@@ -610,7 +629,20 @@ void radio_transmit(uint8_t channel, uint8_t *data, uint32_t len)
 void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len)
 {
   RAIL_WriteTxFifo(rail_handle, data, len, true);
-  RAIL_Status_t rail_status = RAIL_StartTx(rail_handle, tx_channel, RAIL_TX_OPTIONS_DEFAULT, NULL);
+
+  // RAIL takes deci-dBm and coerces the value to the PA curve and the channel's maximum
+  RAIL_SetTxPowerDbm(rail_handle, (RAIL_TxPower_t)tx_power_dbm * 10);
+
+  RAIL_Status_t rail_status;
+  if (tx_flags & TRANSMIT_FLAG_CCA)
+  {
+    rail_status = RAIL_StartCcaLbtTx(rail_handle, tx_channel, RAIL_TX_OPTIONS_DEFAULT, &lbt_config, NULL);
+  }
+  else
+  {
+    rail_status = RAIL_StartTx(rail_handle, tx_channel, RAIL_TX_OPTIONS_DEFAULT, NULL);
+  }
+
   if (rail_status == RAIL_STATUS_NO_ERROR)
   {
     respond_cmd_transmit(TX_RESULT_QUEUED);

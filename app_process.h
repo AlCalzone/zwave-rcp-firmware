@@ -72,7 +72,9 @@ void uart_transmit_frame(frame_type_t frame_type, func_id_t func_id, uint8_t *pa
 void uart_transmit_byte(uint8_t byte);
 
 /// @brief Queue raw data for transmission over radio
-void radio_transmit(uint8_t channel, uint8_t *data, uint32_t len);
+/// @param power_dbm Transmit power in dBm, coerced by RAIL to the channel's maximum
+/// @param flags Bitmask of TRANSMIT_FLAG_*
+void radio_transmit(uint8_t channel, int8_t power_dbm, uint8_t flags, uint8_t *data, uint32_t len);
 /// @brief Change the region of the radio
 bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_channel_cfg_t channel_cfg, uint8_t* num_channels, channel_info_t* channels);
 /// @brief Adopt the region RAIL currently has configured: channel count, RX channel hopping and RX restart
