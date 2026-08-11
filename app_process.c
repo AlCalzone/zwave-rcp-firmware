@@ -297,9 +297,9 @@ static void uart_handle_rx(RAIL_Handle_t rail_handle)
     return;
   }
 
-  // We need at least 5 bytes to process a frame
+  // We need SOF and LEN to validate the frame length
   uint8_t remaining = uart_rx_pos - i;
-  if (remaining < 5)
+  if (remaining < 2)
   {
     // Not enough data to process a frame
     return;
@@ -628,9 +628,10 @@ static void export_channel_info(const RAIL_ZWAVE_RegionConfig_t *region_config, 
 
 void radio_transmit(uint8_t channel, int16_t power_deci_dbm, uint8_t flags, uint8_t *data, uint32_t len)
 {
-  if (out_packet_len > 0 || tx_in_flight)
+  if (out_packet_len > 0 || tx_in_flight || rail_packet_sent || tx_error != 0)
   {
-    // There is already a packet in the buffer or on the air
+    // There is already a packet in the buffer or on the air, or a completed
+    // transmit the state machine has not reported to the host yet
     respond_cmd_transmit(TX_RESULT_BUSY);
     return;
   }
