@@ -84,7 +84,7 @@ bool uart_rx_done = false;
 bool uart_tx_done = false;
 
 static uint8_t tx_channel = 0;
-static int8_t tx_power_dbm = 0;
+static int16_t tx_power_deci_dbm = 0;
 static uint8_t tx_flags = 0;
 /// Number of channels the currently configured region has
 static uint8_t region_num_channels = 0;
@@ -626,7 +626,7 @@ static void export_channel_info(const RAIL_ZWAVE_RegionConfig_t *region_config, 
   }
 }
 
-void radio_transmit(uint8_t channel, int8_t power_dbm, uint8_t flags, uint8_t *data, uint32_t len)
+void radio_transmit(uint8_t channel, int16_t power_deci_dbm, uint8_t flags, uint8_t *data, uint32_t len)
 {
   if (out_packet_len > 0 || tx_in_flight)
   {
@@ -649,7 +649,7 @@ void radio_transmit(uint8_t channel, int8_t power_dbm, uint8_t flags, uint8_t *d
 
   // Queue the packet. The response will be handled by `rail_transmit()`
   tx_channel = channel;
-  tx_power_dbm = power_dbm;
+  tx_power_deci_dbm = power_deci_dbm;
   tx_flags = flags;
   memcpy(OUT_PACKET, data, len);
   out_packet_len = len;
@@ -657,14 +657,14 @@ void radio_transmit(uint8_t channel, int8_t power_dbm, uint8_t flags, uint8_t *d
 
 static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len)
 {
-  if (tx_power_dbm != (int8_t)TX_POWER_UNCHANGED)
+  if (tx_power_deci_dbm != TX_POWER_UNCHANGED)
   {
     // RAIL coerces the requested power against the channel the radio is tuned
     // to, and RX channel hopping parks it on an arbitrary channel
     RAIL_PrepareChannel(rail_handle, tx_channel);
 
-    // RAIL takes deci-dBm and clamps to the PA curve and the channel's maximum
-    RAIL_Status_t power_status = RAIL_SetTxPowerDbm(rail_handle, (RAIL_TxPower_t)tx_power_dbm * 10);
+    // RAIL clamps the power to the PA curve and the channel's maximum
+    RAIL_Status_t power_status = RAIL_SetTxPowerDbm(rail_handle, (RAIL_TxPower_t)tx_power_deci_dbm);
     if (power_status != RAIL_STATUS_NO_ERROR)
     {
       // Transmitting at the previous power would misreport what the host asked for
