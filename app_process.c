@@ -59,6 +59,11 @@ typedef enum
 //                          Static Function Declarations
 // -----------------------------------------------------------------------------
 static void handle_received_packet(RAIL_Handle_t rail_handle);
+static void uart_handle_rx(RAIL_Handle_t rail_handle);
+static void reset_rx_fifo(uint8_t new_start);
+static void uart_handle_frame(RAIL_Handle_t rail_handle, frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint8_t len);
+static void export_channel_info(const RAIL_ZWAVE_RegionConfig_t *region_config, uint8_t *num_channels, channel_info_t *channels);
+static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len);
 
 // -----------------------------------------------------------------------------
 //                                Global Variables
@@ -101,6 +106,10 @@ static bool rail_packet_received = false;
 static bool rail_error = false;
 static uint8_t tx_error = 0;
 
+/// A transmit was handed to RAIL and has not completed yet. The radio owns
+/// the TX FIFO and the PA power until then, so no other transmit may start.
+static volatile bool tx_in_flight = false;
+
 /// Request start receiving
 static bool start_rx = true;
 
@@ -115,8 +124,15 @@ static volatile RAIL_RxPacketHandle_t rx_packet_handle = RAIL_RX_PACKET_HANDLE_I
 
 /// LBT parameters for transmits that request CCA. A single check with no
 /// backoff, so the host stays in charge of the retry policy.
-/// The threshold follows G.9959 §7.1.2.5.4: "The PHY shall be able to perform
-/// a CCA with a threshold of –80 dBm"
+///
+/// G.9959 §7.1.2.5.4: "The PHY shall be able to perform a CCA with a threshold
+/// of –80 dBm. In a given deployment, a listen before talk (LBT) operation
+/// based on CCA shall comply with actual regional RF regulatory requirements,
+/// e.g., listening period and threshold."
+///
+/// The fixed threshold and duration below are a known simplification. Deriving
+/// the listening period and threshold from the active region is a tracked
+/// follow-up.
 static const RAIL_LbtConfig_t lbt_config = {
     .lbtMinBoRand = 0,
     .lbtMaxBoRand = 0,
@@ -262,7 +278,7 @@ void uart_transmit_byte(uint8_t byte)
 }
 
 /// @brief Handle a received frame over UART
-void uart_handle_rx(RAIL_Handle_t rail_handle)
+static void uart_handle_rx(RAIL_Handle_t rail_handle)
 {
   // Skip all data that does not start with SOF
   int i = 0;
@@ -296,6 +312,15 @@ void uart_handle_rx(RAIL_Handle_t rail_handle)
   // Check the length of the frame, not including SOF and checksum
   uint8_t len = UART_RX_FIFO[i++];
   chksum ^= len;
+
+  if (len < 3)
+  {
+    // LEN must cover at least the frame type, the function ID and the checksum.
+    // Anything shorter underflows the payload length passed to the handlers.
+    reset_rx_fifo(i);
+    uart_transmit_byte(NAK);
+    return;
+  }
 
   remaining = uart_rx_pos - i;
   if (remaining < len)
@@ -338,7 +363,7 @@ void uart_handle_rx(RAIL_Handle_t rail_handle)
   }
 }
 
-void reset_rx_fifo(uint8_t new_start)
+static void reset_rx_fifo(uint8_t new_start)
 {
   if (new_start < uart_rx_pos)
   {
@@ -347,7 +372,7 @@ void reset_rx_fifo(uint8_t new_start)
   uart_rx_pos = 0;
 }
 
-void uart_handle_frame(RAIL_Handle_t rail_handle, frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint8_t len)
+static void uart_handle_frame(RAIL_Handle_t rail_handle, frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint8_t len)
 {
   if (frame_type != FRAME_TYPE_REQ)
   {
@@ -583,7 +608,7 @@ void radio_sync_active_region(RAIL_Handle_t rail_handle)
   rail_state = RAILS_IDLE;
 }
 
-void export_channel_info(RAIL_ZWAVE_RegionConfig_t *region_config, uint8_t *num_channels, channel_info_t *channels)
+static void export_channel_info(const RAIL_ZWAVE_RegionConfig_t *region_config, uint8_t *num_channels, channel_info_t *channels)
 {
   for (int i = 0; i < RAIL_NUM_ZWAVE_CHANNELS; i++)
   {
@@ -599,9 +624,9 @@ void export_channel_info(RAIL_ZWAVE_RegionConfig_t *region_config, uint8_t *num_
 
 void radio_transmit(uint8_t channel, int8_t power_dbm, uint8_t flags, uint8_t *data, uint32_t len)
 {
-  if (out_packet_len > 0)
+  if (out_packet_len > 0 || tx_in_flight)
   {
-    // There is already a packet in the buffer
+    // There is already a packet in the buffer or on the air
     respond_cmd_transmit(TX_RESULT_BUSY);
     return;
   }
@@ -626,12 +651,26 @@ void radio_transmit(uint8_t channel, int8_t power_dbm, uint8_t flags, uint8_t *d
   out_packet_len = len;
 }
 
-void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len)
+static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len)
 {
-  RAIL_WriteTxFifo(rail_handle, data, len, true);
+  if (tx_power_dbm != (int8_t)TX_POWER_UNCHANGED)
+  {
+    // RAIL coerces the requested power against the channel the radio is tuned
+    // to, and RX channel hopping parks it on an arbitrary channel
+    RAIL_PrepareChannel(rail_handle, tx_channel);
 
-  // RAIL takes deci-dBm and coerces the value to the PA curve and the channel's maximum
-  RAIL_SetTxPowerDbm(rail_handle, (RAIL_TxPower_t)tx_power_dbm * 10);
+    // RAIL takes deci-dBm and clamps to the PA curve and the channel's maximum
+    RAIL_Status_t power_status = RAIL_SetTxPowerDbm(rail_handle, (RAIL_TxPower_t)tx_power_dbm * 10);
+    if (power_status != RAIL_STATUS_NO_ERROR)
+    {
+      // Transmitting at the previous power would misreport what the host asked for
+      respond_cmd_transmit(TX_RESULT_INVALID_PARAM);
+      rail_state = RAILS_RX;
+      return;
+    }
+  }
+
+  RAIL_WriteTxFifo(rail_handle, data, len, true);
 
   RAIL_Status_t rail_status;
   if (tx_flags & TRANSMIT_FLAG_CCA)
@@ -645,14 +684,18 @@ void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len)
 
   if (rail_status == RAIL_STATUS_NO_ERROR)
   {
+    tx_in_flight = true;
     respond_cmd_transmit(TX_RESULT_QUEUED);
   }
   else if (rail_status == RAIL_STATUS_INVALID_PARAMETER)
   {
+    // RAIL never started, so no completion event will arrive to leave RAILS_TX
+    rail_state = RAILS_RX;
     respond_cmd_transmit(TX_RESULT_INVALID_PARAM);
   }
   else
   {
+    rail_state = RAILS_RX;
     // TODO: Figure out oother possible errors and expose them
     respond_cmd_transmit(TX_RESULT_UNKNOWN_ERROR);
   }
@@ -669,6 +712,7 @@ void sl_rail_util_on_event(RAIL_Handle_t rail_handle, RAIL_Events_t events)
   // Handle Tx events
   if (events & RAIL_EVENTS_TX_COMPLETION)
   {
+    tx_in_flight = false;
     if (events & RAIL_EVENT_TX_PACKET_SENT)
     {
       rail_packet_sent = true;
