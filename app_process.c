@@ -586,6 +586,10 @@ void radio_get_region(RAIL_Handle_t rail_handle, zwave_region_t *region, zwave_c
   export_channel_info(region_config, num_channels, channels);
 }
 
+/// Cache the channel count and data rates of the region RAIL currently has
+/// configured and reconfigure RX channel hopping for it. Transmit validation
+/// reads this cached state, so it must be refreshed whenever the region
+/// changes.
 void radio_sync_active_region(RAIL_Handle_t rail_handle)
 {
   zwave_region_t region;

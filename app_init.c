@@ -101,7 +101,8 @@ RAIL_Handle_t app_init(void)
   // Get RAIL handle, used later by the application
   RAIL_Handle_t rail_handle = sl_rail_util_get_handle(SL_RAIL_UTIL_HANDLE_INST0);
   set_up_tx_fifo(rail_handle);
-  // The radio comes up with the region from the RAIL util configuration
+  // The RAIL util config already applied a region during startup. Adopt its
+  // channel setup so transmit validation matches from the first command on.
   radio_sync_active_region(rail_handle);
 
   return rail_handle;
