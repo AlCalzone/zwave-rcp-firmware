@@ -1003,14 +1003,15 @@ static void beam_stop(RAIL_Handle_t rail_handle)
   RAIL_SetFixedLength(rail_handle, RAIL_SETFIXEDLENGTH_INVALID);
   RAIL_YieldRadio(rail_handle);
 
-  // The repeat train's events must not leak into the next FUNC_ID_TRANSMIT
+  RAIL_EnableRxChannelHopping(rail_handle, true, true);
+
+  // Clear last, so an event the repeat train raised on its way out cannot leak
+  // into the next FUNC_ID_TRANSMIT
   beam_timer_fired = false;
   beam_tx_error = 0;
   rail_packet_sent = false;
   tx_error = 0;
   tx_in_flight = false;
-
-  RAIL_EnableRxChannelHopping(rail_handle, true, true);
 
   // Enabling hopping idles the radio, so return to the state that starts RX
   rail_state = RAILS_IDLE;
