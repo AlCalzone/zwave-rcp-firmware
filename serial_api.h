@@ -17,6 +17,8 @@ typedef enum
 	FUNC_ID_SETUP_RADIO = 0x02,
 	FUNC_ID_TRANSMIT = 0x03,
 	FUNC_ID_RECEIVE = 0x04,
+	FUNC_ID_TRANSMIT_BEAM = 0x05,
+	FUNC_ID_ABORT_BEAM = 0x06,
 } func_id_t;
 
 typedef enum
@@ -35,7 +37,7 @@ typedef enum
 {
 	// The frame was successfully queued for transmission
 	TX_RESULT_QUEUED = 0x00,
-	// The TX FIFO is busy, cannot queue the frame
+	// The TX FIFO is busy, so the frame was not queued
 	TX_RESULT_BUSY = 0x01,
 	// The frame is too long to be transmitted
 	TX_RESULT_OVERFLOW = 0x02,
@@ -51,7 +53,6 @@ typedef enum
 	TX_RESULT_CHANNEL_BUSY = 0xf3,
 	TX_RESULT_UNKNOWN_ERROR = 0xfe,
 
-	// Transmission completed
 	TX_RESULT_COMPLETED = 0xff,
 } tx_result_t;
 
@@ -59,8 +60,12 @@ typedef enum
 /// 3276.7 dBm is not a valid power level in the Z-Wave power tables.
 #define TX_POWER_UNCHANGED 0x7fff
 
-/// Transmit with CCA instead of transmitting right away
+/// Perform a clear channel assessment before transmitting
 #define TRANSMIT_FLAG_CCA 0x01
+
+/// Longest beam frame content the host may hand to FUNC_ID_TRANSMIT_BEAM.
+/// G.9959 §8.1.3.10 beam frames carry 3 bytes, Z-Wave LR beam frames 4.
+#define BEAM_DATA_MAX_LEN 8
 
 typedef enum {
 	SETUP_RADIO_CMD_SET_REGION = 0x01,
@@ -102,18 +107,26 @@ typedef struct {
 	zwave_baudrate_t baud;
 } channel_info_t;
 
+/// @brief Handle a request for the firmware and radio library versions
 void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len);
 
+/// @brief Handle a request to configure the radio
 void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len);
 
 /// @brief Handle a transmit request
-/// HOST -> ZW: CHANNEL | TX_POWER (int16 BE, deci-dBm, or TX_POWER_UNCHANGED) | FLAGS | ...DATA
-/// ZW -> HOST: TX_RESULT
-/// ZW -> HOST (callback): TX_RESULT
 void handle_cmd_transmit(uint8_t *payload, uint8_t len);
 void respond_cmd_transmit(tx_result_t result);
 void callback_cmd_transmit(tx_result_t result);
 
+/// @brief Handle a request to transmit a wakeup beam
+void handle_cmd_transmit_beam(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len);
+void respond_cmd_transmit_beam(tx_result_t result);
+void callback_cmd_transmit_beam(tx_result_t result);
+
+/// @brief Handle a request to stop an ongoing beam
+void handle_cmd_abort_beam(RAIL_Handle_t rail_handle);
+
+/// @brief Report a received frame to the host
 void notify_receive(uint8_t *data, uint8_t len, int8_t rssi, uint8_t lqi, uint8_t channel);
 
 #endif

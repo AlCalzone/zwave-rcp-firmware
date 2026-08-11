@@ -27,6 +27,8 @@ void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len)
 			(1 << (FUNC_ID_SETUP_RADIO - 1)) |
 			(1 << (FUNC_ID_TRANSMIT - 1)) |
 			(1 << (FUNC_ID_RECEIVE - 1)) |
+			(1 << (FUNC_ID_TRANSMIT_BEAM - 1)) |
+			(1 << (FUNC_ID_ABORT_BEAM - 1)) |
 			0};
 
 	uart_transmit_frame(FRAME_TYPE_RESP, FUNC_ID_GET_FIRMWARE_INFO, resp, sizeof(resp));
@@ -115,7 +117,7 @@ void handle_cmd_transmit(uint8_t *payload, uint8_t len)
 
 	if (len < 5)
 	{
-		// The header takes 4 bytes, and there has to be something to transmit
+		// The header takes 4 bytes, followed by at least one data byte
 		respond_cmd_transmit(TX_RESULT_INVALID_PARAM);
 		return;
 	}
@@ -149,9 +151,90 @@ void callback_cmd_transmit(tx_result_t result)
 		sizeof(payload));
 }
 
+void handle_cmd_transmit_beam(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len)
+{
+	// HOST -> ZW: TX_POWER (int16 BE, deci-dBm, or TX_POWER_UNCHANGED) | NUM_FRAGMENTS | FRAGMENT_DURATION_MS (u16 BE) | FRAGMENT_PERIOD_MS (u16 BE) | NUM_CHANNELS | ...CHANNELS | ...DATA
+	// ZW -> HOST: TX_RESULT
+	// ZW -> HOST (callback): TX_RESULT
+	//
+	// The callback carries TX_RESULT_COMPLETED for a beam that ran to its last
+	// fragment, TX_RESULT_ABORTED for one that FUNC_ID_ABORT_BEAM or a region
+	// change stopped, and any other radio error the repeat train ran into.
+	//
+	// A beam leaves the radio at the power it used, so a later transmit passing
+	// TX_POWER_UNCHANGED goes out at the beam's power.
+
+	if (len < 10)
+	{
+		// The header takes 8 bytes, followed by at least one channel and one data byte
+		respond_cmd_transmit_beam(TX_RESULT_INVALID_PARAM);
+		return;
+	}
+
+	int16_t power_deci_dbm = (int16_t)(((uint16_t)payload[0] << 8) | payload[1]);
+	uint8_t num_fragments = payload[2];
+	uint16_t fragment_duration_ms = ((uint16_t)payload[3] << 8) | payload[4];
+	uint16_t fragment_period_ms = ((uint16_t)payload[5] << 8) | payload[6];
+	uint8_t num_channels = payload[7];
+
+	if (num_channels == 0 || len < 8 + num_channels + 1)
+	{
+		respond_cmd_transmit_beam(TX_RESULT_INVALID_PARAM);
+		return;
+	}
+
+	const uint8_t *channels = &payload[8];
+	const uint8_t *data = &payload[8 + num_channels];
+	uint8_t data_len = len - 8 - num_channels;
+
+	radio_transmit_beam(
+		rail_handle,
+		power_deci_dbm,
+		num_fragments,
+		fragment_duration_ms,
+		fragment_period_ms,
+		num_channels,
+		channels,
+		data,
+		data_len);
+}
+
+void respond_cmd_transmit_beam(tx_result_t result)
+{
+	uint8_t payload[1] = {result};
+	uart_transmit_frame(
+		FRAME_TYPE_RESP,
+		FUNC_ID_TRANSMIT_BEAM,
+		payload,
+		sizeof(payload));
+}
+
+void callback_cmd_transmit_beam(tx_result_t result)
+{
+	uint8_t payload[1] = {result};
+	uart_transmit_frame(
+		FRAME_TYPE_CALLBACK,
+		FUNC_ID_TRANSMIT_BEAM,
+		payload,
+		sizeof(payload));
+}
+
+void handle_cmd_abort_beam(RAIL_Handle_t rail_handle)
+{
+	// HOST -> ZW: ()
+	// ZW -> HOST: 1
+
+	// Aborting reports success even when no beam was running, so the host can
+	// call this without tracking whether its beam already completed
+	uint8_t resp[1] = {1};
+	uart_transmit_frame(FRAME_TYPE_RESP, FUNC_ID_ABORT_BEAM, resp, sizeof(resp));
+
+	radio_abort_beam(rail_handle);
+}
+
 void notify_receive(uint8_t *data, uint8_t len, int8_t rssi, uint8_t lqi, uint8_t channel)
 {
-	// ZW -> HOST: LEN | ...DATA | RSSI | LQI | channel
+	// ZW -> HOST (callback): LEN | ...DATA | RSSI | LQI | CHANNEL
 	uint8_t payload[len + 4];
 	payload[0] = len;
 	memcpy(&payload[1], data, len);

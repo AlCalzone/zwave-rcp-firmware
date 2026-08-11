@@ -1,10 +1,3 @@
-/*
- * common.h
- *
- *  Created on: 28.03.2025
- *      Author: domin
- */
-
 #ifndef COMMON_H_
 #define COMMON_H_
 
