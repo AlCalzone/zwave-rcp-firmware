@@ -53,7 +53,25 @@ typedef enum
   RAILS_IDLE,
   RAILS_RX,
   RAILS_TX,
+  RAILS_BEAM,
 } rail_state_t;
+
+/// Beam preamble lengths in bits, G.9959 Table 7-10 "Minimum Preamble length"
+/// for R2 (20 bytes) and R3 in channel configuration 3 (8 bytes), and Z-Wave
+/// Long Range PHY and MAC Layer Specification Table 5-10 "Required Preamble
+/// length" for LR (8 bytes / 16 symbols).
+#define BEAM_PREAMBLE_BITS_R2 (20 * 8)
+#define BEAM_PREAMBLE_BITS_R3 (8 * 8)
+#define BEAM_PREAMBLE_BITS_LR (8 * 8)
+
+/// A rate that carries no beam preamble length in the tables above
+#define BEAM_PREAMBLE_BITS_NONE 0
+
+/// The Z-Wave PHY appends a checksum that beam frames must not carry, sends
+/// exactly the fixed length configured below, and takes the beam preamble
+/// length from RAIL_SetTxAltPreambleLength(). RESEND lets every repeat reuse
+/// the frame written to the TX FIFO once.
+#define BEAM_TX_OPTIONS (RAIL_TX_OPTION_REMOVE_CRC | RAIL_TX_OPTION_ALT_PREAMBLE_LEN | RAIL_TX_OPTION_RESEND)
 
 // -----------------------------------------------------------------------------
 //                          Static Function Declarations
@@ -64,6 +82,12 @@ static void reset_rx_fifo(uint8_t new_start);
 static void uart_handle_frame(RAIL_Handle_t rail_handle, frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint8_t len);
 static void export_channel_info(const RAIL_ZWAVE_RegionConfig_t *region_config, uint8_t *num_channels, channel_info_t *channels);
 static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len);
+static uint16_t beam_preamble_bits(zwave_baudrate_t baud);
+static tx_result_t beam_start_fragment(RAIL_Handle_t rail_handle);
+static void beam_pause_radio(RAIL_Handle_t rail_handle);
+static void beam_end(RAIL_Handle_t rail_handle, tx_result_t result);
+static void beam_advance(RAIL_Handle_t rail_handle);
+static void beam_timer_expired(RAIL_Handle_t rail_handle);
 
 // -----------------------------------------------------------------------------
 //                                Global Variables
@@ -88,6 +112,8 @@ static int16_t tx_power_deci_dbm = 0;
 static uint8_t tx_flags = 0;
 /// Number of channels the currently configured region has
 static uint8_t region_num_channels = 0;
+/// Data rate of each channel of the currently configured region
+static zwave_baudrate_t region_channel_baud[RAIL_NUM_ZWAVE_CHANNELS] = {0};
 static uint8_t OUT_PACKET[RAIL_FIFO_SIZE] = {0};
 static uint32_t out_packet_len = 0;
 
@@ -112,6 +138,42 @@ static volatile bool tx_in_flight = false;
 
 /// Request start receiving
 static bool start_rx = true;
+
+/// A beam is running, so TX completion events belong to its repeat train and
+/// no other transmit may start
+static volatile bool beam_active = false;
+
+/// The beam timer expired, so the main loop moves the beam to its next phase
+static volatile bool beam_timer_fired = false;
+
+/// The beam the host requested with FUNC_ID_TRANSMIT_BEAM
+static struct
+{
+  uint8_t num_fragments;
+  uint8_t fragment_index;
+  uint32_t fragment_duration_us;
+  uint32_t fragment_period_us;
+  uint8_t num_channels;
+  uint8_t channels[RAIL_NUM_ZWAVE_CHANNELS];
+  uint8_t data[BEAM_DATA_MAX_LEN];
+  uint8_t data_len;
+  int8_t power_dbm;
+  /// RAIL time the current fragment started, the reference the period counts from
+  RAIL_Time_t fragment_start;
+  /// The repeat train is on air
+  bool transmitting;
+} beam = {0};
+
+/// Repeat the beam frame until the fragment timer stops it. RAIL chains the
+/// repeats in hardware, so only the PA ramp separates two frames.
+///
+/// G.9959 §8.1.3.12: "The beam frames shall be sent back to back to prevent
+/// other TXs from interrupting the continuous beam."
+static const RAIL_TxRepeatConfig_t beam_repeat_config = {
+    .iterations = RAIL_TX_REPEAT_INFINITE_ITERATIONS,
+    .repeatOptions = RAIL_TX_REPEAT_OPTIONS_NONE,
+    .delayOrHop = {.delay = 0},
+};
 
 /// Copy of last RAIL events to process
 static RAIL_Events_t rail_last_state = RAIL_EVENTS_NONE;
@@ -224,6 +286,20 @@ void app_process_action(RAIL_Handle_t rail_handle)
       tx_error = 0;
       // TODO: Notify application that there was an error
       rail_state = RAILS_RX;
+    }
+  }
+  else if (rail_state == RAILS_BEAM)
+  {
+    if (beam_timer_fired)
+    {
+      beam_timer_fired = false;
+      beam_advance(rail_handle);
+    }
+    else if (rail_packet_received)
+    {
+      // Between fragments the radio is back in RX, where the woken node's ack arrives
+      rail_packet_received = false;
+      handle_received_packet(rail_handle);
     }
   }
 
@@ -393,6 +469,14 @@ static void uart_handle_frame(RAIL_Handle_t rail_handle, frame_type_t frame_type
 
   case FUNC_ID_TRANSMIT:
     handle_cmd_transmit(payload, len);
+    break;
+
+  case FUNC_ID_TRANSMIT_BEAM:
+    handle_cmd_transmit_beam(rail_handle, payload, len);
+    break;
+
+  case FUNC_ID_ABORT_BEAM:
+    handle_cmd_abort_beam(rail_handle);
     break;
   default:
     // Unknown command
@@ -595,6 +679,13 @@ void radio_sync_active_region(RAIL_Handle_t rail_handle)
   zwave_region_t region;
   zwave_channel_cfg_t channel_cfg;
   const RAIL_ZWAVE_RegionConfig_t *region_config = resolve_active_region(rail_handle, &region, &channel_cfg);
+
+  // A running beam addresses channels of the region it was started in
+  if (beam_active)
+  {
+    beam_end(rail_handle, TX_RESULT_ABORTED);
+  }
+
   if (region_config == NULL)
   {
     region_num_channels = 0;
@@ -604,6 +695,11 @@ void radio_sync_active_region(RAIL_Handle_t rail_handle)
   channel_info_t channels[RAIL_NUM_ZWAVE_CHANNELS] = {0};
   region_num_channels = 0;
   export_channel_info(region_config, &region_num_channels, channels);
+
+  for (uint8_t i = 0; i < region_num_channels; i++)
+  {
+    region_channel_baud[i] = channels[i].baud;
+  }
 
   // Dwell times and the number of hopped channels differ per region
   init_rx_channel_hopping(rail_handle, region_num_channels);
@@ -628,7 +724,7 @@ static void export_channel_info(const RAIL_ZWAVE_RegionConfig_t *region_config, 
 
 void radio_transmit(uint8_t channel, int16_t power_deci_dbm, uint8_t flags, uint8_t *data, uint32_t len)
 {
-  if (out_packet_len > 0 || tx_in_flight || rail_packet_sent || tx_error != 0)
+  if (out_packet_len > 0 || tx_in_flight || rail_packet_sent || tx_error != 0 || beam_active)
   {
     // There is already a packet in the buffer or on the air, or a completed
     // transmit the state machine has not reported to the host yet
@@ -706,6 +802,197 @@ static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len
   }
 }
 
+void radio_transmit_beam(RAIL_Handle_t rail_handle, int8_t power_dbm, uint8_t num_fragments, uint16_t fragment_duration_ms, uint16_t fragment_period_ms, uint8_t num_channels, const uint8_t *channels, const uint8_t *data, uint8_t data_len)
+{
+  if (out_packet_len > 0 || tx_in_flight || beam_active)
+  {
+    // There is already a packet in the buffer or on the air
+    respond_cmd_transmit_beam(TX_RESULT_BUSY);
+    return;
+  }
+  if (num_fragments == 0 || num_channels > RAIL_NUM_ZWAVE_CHANNELS || data_len == 0 || data_len > BEAM_DATA_MAX_LEN || fragment_duration_ms == 0)
+  {
+    respond_cmd_transmit_beam(TX_RESULT_INVALID_PARAM);
+    return;
+  }
+  if (num_fragments > 1 && fragment_duration_ms > fragment_period_ms)
+  {
+    // Fragments would overlap
+    respond_cmd_transmit_beam(TX_RESULT_INVALID_PARAM);
+    return;
+  }
+
+  // Every fragment must be startable, so reject the whole beam if any channel
+  // is unknown or carries a rate that has no beam preamble length
+  for (uint8_t i = 0; i < num_channels; i++)
+  {
+    if (channels[i] >= region_num_channels || beam_preamble_bits(region_channel_baud[channels[i]]) == BEAM_PREAMBLE_BITS_NONE)
+    {
+      respond_cmd_transmit_beam(TX_RESULT_INVALID_CHANNEL);
+      return;
+    }
+  }
+
+  beam.num_fragments = num_fragments;
+  beam.fragment_index = 0;
+  beam.fragment_duration_us = (uint32_t)fragment_duration_ms * 1000;
+  beam.fragment_period_us = (uint32_t)fragment_period_ms * 1000;
+  beam.num_channels = num_channels;
+  memcpy(beam.channels, channels, num_channels);
+  memcpy(beam.data, data, data_len);
+  beam.data_len = data_len;
+  beam.power_dbm = power_dbm;
+  beam.transmitting = false;
+
+  beam_active = true;
+  beam_timer_fired = false;
+  rail_state = RAILS_BEAM;
+
+  tx_result_t result = beam_start_fragment(rail_handle);
+  if (result != TX_RESULT_QUEUED)
+  {
+    // The host learns about the failure from the response, so no callback follows
+    beam_active = false;
+    rail_state = RAILS_RX;
+  }
+  respond_cmd_transmit_beam(result);
+}
+
+void radio_abort_beam(RAIL_Handle_t rail_handle)
+{
+  if (!beam_active)
+  {
+    return;
+  }
+  beam_end(rail_handle, TX_RESULT_ABORTED);
+}
+
+static uint16_t beam_preamble_bits(zwave_baudrate_t baud)
+{
+  switch (baud)
+  {
+  case ZWAVE_BAUD_40k:
+    return BEAM_PREAMBLE_BITS_R2;
+  case ZWAVE_BAUD_100k:
+    return BEAM_PREAMBLE_BITS_R3;
+  case ZWAVE_BAUD_LR100k:
+    return BEAM_PREAMBLE_BITS_LR;
+  default:
+    // G.9959 Table 7-10 lists no beam preamble length for R1
+    return BEAM_PREAMBLE_BITS_NONE;
+  }
+}
+
+/// @brief Put the repeat train for the current fragment on air
+static tx_result_t beam_start_fragment(RAIL_Handle_t rail_handle)
+{
+  uint8_t channel = beam.channels[beam.fragment_index % beam.num_channels];
+
+  // Take the radio out of RX channel hopping before reconfiguring the PHY
+  RAIL_Idle(rail_handle, RAIL_IDLE_ABORT, true);
+
+  if (beam.power_dbm != (int8_t)TX_POWER_UNCHANGED)
+  {
+    // RAIL coerces the requested power against the channel the radio is tuned
+    // to, so each fragment sets it again for the channel it uses
+    RAIL_PrepareChannel(rail_handle, channel);
+
+    // RAIL takes deci-dBm and clamps to the PA curve and the channel's maximum
+    if (RAIL_SetTxPowerDbm(rail_handle, (RAIL_TxPower_t)beam.power_dbm * 10) != RAIL_STATUS_NO_ERROR)
+    {
+      // Transmitting at the previous power would misreport what the host asked for
+      beam_pause_radio(rail_handle);
+      return TX_RESULT_INVALID_PARAM;
+    }
+  }
+
+  // Beam frames carry no length field for the PHY's variable length decoding
+  // to read, so fixed length mode makes RAIL send exactly the bytes the host
+  // handed us. This also applies to RX, so it is restored before RX resumes.
+  RAIL_SetFixedLength(rail_handle, beam.data_len);
+  RAIL_SetTxAltPreambleLength(rail_handle, beam_preamble_bits(region_channel_baud[channel]));
+  RAIL_WriteTxFifo(rail_handle, beam.data, beam.data_len, true);
+  RAIL_SetNextTxRepeat(rail_handle, &beam_repeat_config);
+
+  beam.transmitting = true;
+  beam.fragment_start = RAIL_GetTime();
+  RAIL_Status_t status = RAIL_StartTx(rail_handle, channel, BEAM_TX_OPTIONS, NULL);
+  if (status != RAIL_STATUS_NO_ERROR)
+  {
+    beam_pause_radio(rail_handle);
+    return status == RAIL_STATUS_INVALID_PARAMETER ? TX_RESULT_INVALID_PARAM : TX_RESULT_UNKNOWN_ERROR;
+  }
+
+  // Absolute deadlines keep the fragment grid free of the drift that relative
+  // timers accumulate over a long beam
+  RAIL_SetTimer(rail_handle, beam.fragment_start + beam.fragment_duration_us, RAIL_TIME_ABSOLUTE, beam_timer_expired);
+  return TX_RESULT_QUEUED;
+}
+
+/// @brief End the repeat train and hand the radio back to RX
+static void beam_pause_radio(RAIL_Handle_t rail_handle)
+{
+  // Idling clears the pending repeats. It also cuts the frame that is on air
+  // at that moment, so the last frame of a fragment reaches a receiver as a
+  // truncated frame it drops.
+  RAIL_Idle(rail_handle, RAIL_IDLE_ABORT, true);
+  beam.transmitting = false;
+
+  RAIL_SetFixedLength(rail_handle, RAIL_SETFIXEDLENGTH_INVALID);
+  RAIL_YieldRadio(rail_handle);
+  RAIL_StartRx(rail_handle, 0, NULL);
+}
+
+/// @brief Stop the beam, report result to the host and return to the RX state
+static void beam_end(RAIL_Handle_t rail_handle, tx_result_t result)
+{
+  RAIL_CancelTimer(rail_handle);
+  beam_timer_fired = false;
+  beam_active = false;
+
+  if (beam.transmitting)
+  {
+    beam_pause_radio(rail_handle);
+  }
+
+  rail_state = RAILS_RX;
+  callback_cmd_transmit_beam(result);
+}
+
+/// @brief Move the beam to its next phase after a fragment or a pause ended
+static void beam_advance(RAIL_Handle_t rail_handle)
+{
+  if (beam.transmitting)
+  {
+    if (beam.fragment_index + 1 >= beam.num_fragments)
+    {
+      beam_end(rail_handle, TX_RESULT_COMPLETED);
+      return;
+    }
+
+    beam_pause_radio(rail_handle);
+
+    // G.9959 §8.1.3.11: "The next beam fragment shall begin in the range
+    // 190-200 ms measured from the beginning of the previous beam fragment."
+    RAIL_SetTimer(rail_handle, beam.fragment_start + beam.fragment_period_us, RAIL_TIME_ABSOLUTE, beam_timer_expired);
+    return;
+  }
+
+  beam.fragment_index++;
+  tx_result_t result = beam_start_fragment(rail_handle);
+  if (result != TX_RESULT_QUEUED)
+  {
+    beam_end(rail_handle, result);
+  }
+}
+
+/// @brief RAIL timer callback, runs in interrupt context
+static void beam_timer_expired(RAIL_Handle_t rail_handle)
+{
+  (void)rail_handle;
+  beam_timer_fired = true;
+}
+
 /******************************************************************************
  * RAIL callback, called if a RAIL event occurs
  *****************************************************************************/
@@ -715,7 +1002,12 @@ void sl_rail_util_on_event(RAIL_Handle_t rail_handle, RAIL_Events_t events)
   rail_last_state = events;
 
   // Handle Tx events
-  if (events & RAIL_EVENTS_TX_COMPLETION)
+  if ((events & RAIL_EVENTS_TX_COMPLETION) && beam_active)
+  {
+    // Every beam frame of the repeat train raises its own completion event.
+    // The fragment timer ends the train, so the events need no bookkeeping.
+  }
+  else if (events & RAIL_EVENTS_TX_COMPLETION)
   {
     tx_in_flight = false;
     if (events & RAIL_EVENT_TX_PACKET_SENT)

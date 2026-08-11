@@ -17,6 +17,8 @@ typedef enum
 	FUNC_ID_SETUP_RADIO = 0x02,
 	FUNC_ID_TRANSMIT = 0x03,
 	FUNC_ID_RECEIVE = 0x04,
+	FUNC_ID_TRANSMIT_BEAM = 0x05,
+	FUNC_ID_ABORT_BEAM = 0x06,
 } func_id_t;
 
 typedef enum
@@ -61,6 +63,10 @@ typedef enum
 
 /// Transmit with CCA instead of transmitting right away
 #define TRANSMIT_FLAG_CCA 0x01
+
+/// Longest beam frame content the host may hand to FUNC_ID_TRANSMIT_BEAM.
+/// G.9959 §8.1.3.10 beam frames carry 3 bytes, Z-Wave LR beam frames 4.
+#define BEAM_DATA_MAX_LEN 8
 
 typedef enum {
 	SETUP_RADIO_CMD_SET_REGION = 0x01,
@@ -113,6 +119,19 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 void handle_cmd_transmit(uint8_t *payload, uint8_t len);
 void respond_cmd_transmit(tx_result_t result);
 void callback_cmd_transmit(tx_result_t result);
+
+/// @brief Handle a request to transmit a wakeup beam
+/// HOST -> ZW: TX_POWER (int8, dBm, or TX_POWER_UNCHANGED) | NUM_FRAGMENTS | FRAGMENT_DURATION_MS (u16 BE) | FRAGMENT_PERIOD_MS (u16 BE) | NUM_CHANNELS | ...CHANNELS | ...DATA
+/// ZW -> HOST: TX_RESULT
+/// ZW -> HOST (callback): TX_RESULT
+void handle_cmd_transmit_beam(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len);
+void respond_cmd_transmit_beam(tx_result_t result);
+void callback_cmd_transmit_beam(tx_result_t result);
+
+/// @brief Handle a request to stop an ongoing beam
+/// HOST -> ZW: ()
+/// ZW -> HOST: 1
+void handle_cmd_abort_beam(RAIL_Handle_t rail_handle);
 
 void notify_receive(uint8_t *data, uint8_t len, int8_t rssi, uint8_t lqi, uint8_t channel);
 
