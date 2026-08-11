@@ -54,11 +54,9 @@
 // -----------------------------------------------------------------------------
 //                                Global Variables
 // -----------------------------------------------------------------------------
-// RX channel hopping
 #define CHANNEL_HOPPING_NUMBER_OF_CHANNELS RAIL_NUM_ZWAVE_CHANNELS
-// The documentation explains some complicated formula to calculate the buffer size,
-// but using that buffer size results in error 0x21 (RAIL_STATUS_INVALID_PARAMETER).
-// It seems that RAIL wants a size of 1050
+// The buffer size formula in the RAIL docs yields RAIL_STATUS_INVALID_PARAMETER (0x21).
+// RAIL accepts a size of 1050.
 #define CHANNEL_HOPPING_BUFFER_SIZE 1050
 
 RAIL_RxChannelHoppingConfigEntry_t channelHoppingEntries[CHANNEL_HOPPING_NUMBER_OF_CHANNELS];
@@ -87,9 +85,8 @@ RAIL_Handle_t app_init(void)
   // This is called once during start-up.                                    //
   /////////////////////////////////////////////////////////////////////////////
 
-  /// EUSART initialization
-  // Enable clocks
-  // CMU_ClockEnable(cmuClock_GPIO, true); // should be enabled by the stack
+  // EUSART initialization
+  // The GPIO clock is already enabled by the stack
   CMU_ClockEnable(cmuClock_EUSART0, true);
 
   initGPIO();
@@ -98,7 +95,6 @@ RAIL_Handle_t app_init(void)
   // Start receiving on UART
   EUSART_IntEnable(EUSART0, EUSART_IF_RXFL);
 
-  // Get RAIL handle, used later by the application
   RAIL_Handle_t rail_handle = sl_rail_util_get_handle(SL_RAIL_UTIL_HANDLE_INST0);
   set_up_tx_fifo(rail_handle);
   // The RAIL util config already applied a region during startup. Adopt its
@@ -121,7 +117,6 @@ void initEUSART0(void)
   // Default asynchronous initializer (115.2 Kbps, 8N1, no flow control)
   EUSART_UartInit_TypeDef init = EUSART_UART_INIT_DEFAULT_HF;
 
-  // Bump baudrate to 460.8 kbps
   init.baudrate = 460800;
 
   // Route EUSART0 TX and RX to the board controller TX and RX pins
@@ -146,17 +141,15 @@ void initEUSART0(void)
 void init_rx_channel_hopping(RAIL_Handle_t rail_handle, uint8_t num_channels) {
   channelHoppingConfig.numberOfChannels = num_channels;
 
-  // Force the radio into idle mode
+  // RAIL requires the radio to be idle before configuring channel hopping
   RAIL_Status_t status = RAIL_Idle(rail_handle, RAIL_IDLE_ABORT, false);
   if (status != RAIL_STATUS_NO_ERROR) {
     uint16_t buf[1] = {status};
     uart_transmit((uint8_t*) buf, 2);
   }
 
-  // Populate the channel hopping settings for Z-Wave
   status = RAIL_ZWAVE_ConfigRxChannelHopping(rail_handle, &channelHoppingConfig);
   if (status != RAIL_STATUS_NO_ERROR) {
-    // app_log_error("RAIL_ZWAVE_ConfigRxChannelHopping() failed with status %d\n", status);
       uint16_t buf[1] = {status};
       uart_transmit((uint8_t*) buf, 2);
   }

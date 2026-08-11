@@ -37,7 +37,7 @@ typedef enum
 {
 	// The frame was successfully queued for transmission
 	TX_RESULT_QUEUED = 0x00,
-	// The TX FIFO is busy, cannot queue the frame
+	// The TX FIFO is busy, so the frame was not queued
 	TX_RESULT_BUSY = 0x01,
 	// The frame is too long to be transmitted
 	TX_RESULT_OVERFLOW = 0x02,
@@ -53,7 +53,6 @@ typedef enum
 	TX_RESULT_CHANNEL_BUSY = 0xf3,
 	TX_RESULT_UNKNOWN_ERROR = 0xfe,
 
-	// Transmission completed
 	TX_RESULT_COMPLETED = 0xff,
 } tx_result_t;
 
@@ -61,7 +60,7 @@ typedef enum
 /// 3276.7 dBm is not a valid power level in the Z-Wave power tables.
 #define TX_POWER_UNCHANGED 0x7fff
 
-/// Transmit with CCA instead of transmitting right away
+/// Perform a clear channel assessment before transmitting
 #define TRANSMIT_FLAG_CCA 0x01
 
 /// Longest beam frame content the host may hand to FUNC_ID_TRANSMIT_BEAM.
@@ -124,6 +123,13 @@ void callback_cmd_transmit(tx_result_t result);
 /// HOST -> ZW: TX_POWER (int8, dBm, or TX_POWER_UNCHANGED) | NUM_FRAGMENTS | FRAGMENT_DURATION_MS (u16 BE) | FRAGMENT_PERIOD_MS (u16 BE) | NUM_CHANNELS | ...CHANNELS | ...DATA
 /// ZW -> HOST: TX_RESULT
 /// ZW -> HOST (callback): TX_RESULT
+///
+/// The callback carries TX_RESULT_COMPLETED for a beam that ran to its last
+/// fragment, TX_RESULT_ABORTED for one that FUNC_ID_ABORT_BEAM or a region
+/// change stopped, and any other radio error the repeat train ran into.
+///
+/// A beam leaves the radio at the power it used, so a later transmit passing
+/// TX_POWER_UNCHANGED goes out at the beam's power.
 void handle_cmd_transmit_beam(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len);
 void respond_cmd_transmit_beam(tx_result_t result);
 void callback_cmd_transmit_beam(tx_result_t result);

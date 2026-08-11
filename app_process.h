@@ -86,7 +86,7 @@ void radio_abort_beam(RAIL_Handle_t rail_handle);
 bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_channel_cfg_t channel_cfg, uint8_t* num_channels, channel_info_t* channels);
 /// @brief Adopt the region RAIL currently has configured: channel count, RX channel hopping and RX restart
 void radio_sync_active_region(RAIL_Handle_t rail_handle);
-/// @brief Read the region of the radio and its information
+/// @brief Read the radio's region, channel configuration and channel list
 void radio_get_region(RAIL_Handle_t rail_handle, zwave_region_t* region, zwave_channel_cfg_t* channel_cfg, uint8_t* num_channels, channel_info_t* channels);
 
 // Interrupt handlers for UART

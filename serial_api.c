@@ -117,7 +117,7 @@ void handle_cmd_transmit(uint8_t *payload, uint8_t len)
 
 	if (len < 5)
 	{
-		// The header takes 4 bytes, and there has to be something to transmit
+		// The header takes 4 bytes, followed by at least one data byte
 		respond_cmd_transmit(TX_RESULT_INVALID_PARAM);
 		return;
 	}
@@ -153,7 +153,7 @@ void callback_cmd_transmit(tx_result_t result)
 
 void handle_cmd_transmit_beam(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len)
 {
-	// HOST -> ZW: TX_POWER (int8, dBm) | NUM_FRAGMENTS | FRAGMENT_DURATION_MS (u16 BE) | FRAGMENT_PERIOD_MS (u16 BE) | NUM_CHANNELS | ...CHANNELS | ...DATA
+	// HOST -> ZW: TX_POWER (int8, dBm, or TX_POWER_UNCHANGED) | NUM_FRAGMENTS | FRAGMENT_DURATION_MS (u16 BE) | FRAGMENT_PERIOD_MS (u16 BE) | NUM_CHANNELS | ...CHANNELS | ...DATA
 	// ZW -> HOST: TX_RESULT
 	// ZW -> HOST (callback): TX_RESULT
 
