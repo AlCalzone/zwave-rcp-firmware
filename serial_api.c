@@ -7,7 +7,8 @@
 
 void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len)
 {
-	// The wire format is documented at the declaration in serial_api.h
+	// HOST -> ZW: ()
+	// ZW -> HOST: VER_MAJOR | VER_MINOR | VER_PATCH | LIB_TYPE | LIB_MAJOR | LIB_MINOR | LIB_PATCH | LEN_BITMASK | FUNC_ID_BITMASK
 
 	RAIL_Version_t rail_version = {0};
 	RAIL_GetVersion(&rail_version, false);
@@ -35,13 +36,13 @@ void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len)
 
 void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len)
 {
-	// The wire format is documented at the declaration in serial_api.h
-
 	setup_radio_cmd_t subcmd = payload[0];
 	switch (subcmd)
 	{
 	case SETUP_RADIO_CMD_SET_REGION:
 	{
+		// HOST -> ZW: SET_REGION | REGION | [CHANNEL_CFG]
+		// ZW -> HOST: SET_REGION | RESULT | [NUM_CHANNELS | CH_1_FREQ (32 bit) | CH_1_BAUD | ... | CH_N_FREQ (32 bit) | CH_N_BAUD]
 		zwave_region_t region = payload[1];
 		zwave_channel_cfg_t channel_cfg = CHANNEL_CFG_CLASSIC;
 		if (len >= 3)
@@ -78,6 +79,8 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 	}
 	case SETUP_RADIO_CMD_GET_REGION:
 	{
+		// HOST -> ZW: GET_REGION
+		// ZW -> HOST: GET_REGION | REGION | CHANNEL_CFG | NUM_CHANNELS | CH_1_FREQ (32 bit) | CH_1_BAUD | ... | CH_N_FREQ (32 bit) | CH_N_BAUD
 		zwave_region_t region = REGION_UNKNOWN;
 		zwave_channel_cfg_t channel_cfg = CHANNEL_CFG_CLASSIC;
 		channel_info_t channels[RAIL_NUM_ZWAVE_CHANNELS] = {0};
@@ -108,7 +111,9 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 
 void handle_cmd_transmit(uint8_t *payload, uint8_t len)
 {
-	// The wire format is documented at the declaration in serial_api.h
+	// HOST -> ZW: CHANNEL | TX_POWER (int16 BE, deci-dBm, or TX_POWER_UNCHANGED) | FLAGS | ...DATA
+	// ZW -> HOST: TX_RESULT
+	// ZW -> HOST (callback): TX_RESULT
 
 	if (len < 5)
 	{
@@ -148,7 +153,16 @@ void callback_cmd_transmit(tx_result_t result)
 
 void handle_cmd_transmit_beam(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len)
 {
-	// The wire format is documented at the declaration in serial_api.h
+	// HOST -> ZW: TX_POWER (int16 BE, deci-dBm, or TX_POWER_UNCHANGED) | NUM_FRAGMENTS | FRAGMENT_DURATION_MS (u16 BE) | FRAGMENT_PERIOD_MS (u16 BE) | NUM_CHANNELS | ...CHANNELS | ...DATA
+	// ZW -> HOST: TX_RESULT
+	// ZW -> HOST (callback): TX_RESULT
+	//
+	// The callback carries TX_RESULT_COMPLETED for a beam that ran to its last
+	// fragment, TX_RESULT_ABORTED for one that FUNC_ID_ABORT_BEAM or a region
+	// change stopped, and any other radio error the repeat train ran into.
+	//
+	// A beam leaves the radio at the power it used, so a later transmit passing
+	// TX_POWER_UNCHANGED goes out at the beam's power.
 
 	if (len < 10)
 	{
@@ -207,7 +221,8 @@ void callback_cmd_transmit_beam(tx_result_t result)
 
 void handle_cmd_abort_beam(RAIL_Handle_t rail_handle)
 {
-	// The wire format is documented at the declaration in serial_api.h
+	// HOST -> ZW: ()
+	// ZW -> HOST: 1
 
 	// Aborting reports success even when no beam was running, so the host can
 	// call this without tracking whether its beam already completed
@@ -219,7 +234,7 @@ void handle_cmd_abort_beam(RAIL_Handle_t rail_handle)
 
 void notify_receive(uint8_t *data, uint8_t len, int8_t rssi, uint8_t lqi, uint8_t channel)
 {
-	// The wire format is documented at the declaration in serial_api.h
+	// ZW -> HOST (callback): LEN | ...DATA | RSSI | LQI | CHANNEL
 	uint8_t payload[len + 4];
 	payload[0] = len;
 	memcpy(&payload[1], data, len);
