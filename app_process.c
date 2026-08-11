@@ -164,7 +164,7 @@ static struct
   uint8_t channels[RAIL_NUM_ZWAVE_CHANNELS];
   uint8_t data[BEAM_DATA_MAX_LEN];
   uint8_t data_len;
-  int8_t power_dbm;
+  int16_t power_deci_dbm;
   /// RAIL time the current fragment is scheduled at, the reference the period counts from
   RAIL_Time_t fragment_start;
 } beam = {0};
@@ -787,7 +787,7 @@ static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len
   }
 }
 
-void radio_transmit_beam(RAIL_Handle_t rail_handle, int8_t power_dbm, uint8_t num_fragments, uint16_t fragment_duration_ms, uint16_t fragment_period_ms, uint8_t num_channels, const uint8_t *channels, const uint8_t *data, uint8_t data_len)
+void radio_transmit_beam(RAIL_Handle_t rail_handle, int16_t power_deci_dbm, uint8_t num_fragments, uint16_t fragment_duration_ms, uint16_t fragment_period_ms, uint8_t num_channels, const uint8_t *channels, const uint8_t *data, uint8_t data_len)
 {
   if (out_packet_len > 0 || tx_in_flight || beam_active)
   {
@@ -825,7 +825,7 @@ void radio_transmit_beam(RAIL_Handle_t rail_handle, int8_t power_dbm, uint8_t nu
   memcpy(beam.channels, channels, num_channels);
   memcpy(beam.data, data, data_len);
   beam.data_len = data_len;
-  beam.power_dbm = power_dbm;
+  beam.power_deci_dbm = power_deci_dbm;
 
   beam_active = true;
   beam_transmitting = false;
@@ -909,7 +909,7 @@ static tx_result_t beam_start_fragment(RAIL_Handle_t rail_handle)
   // there between fragments instead of scanning the whole region
   RAIL_EnableRxChannelHopping(rail_handle, false, true);
 
-  if (beam.power_dbm != (int8_t)TX_POWER_UNCHANGED)
+  if (beam.power_deci_dbm != TX_POWER_UNCHANGED)
   {
     // RAIL coerces the requested power against the channel the radio is tuned
     // to, so each fragment sets it again for the channel it uses
@@ -918,8 +918,8 @@ static tx_result_t beam_start_fragment(RAIL_Handle_t rail_handle)
       return TX_RESULT_UNKNOWN_ERROR;
     }
 
-    // RAIL takes deci-dBm and clamps to the PA curve and the channel's maximum
-    if (RAIL_SetTxPowerDbm(rail_handle, (RAIL_TxPower_t)beam.power_dbm * 10) != RAIL_STATUS_NO_ERROR)
+    // RAIL clamps the power to the PA curve and the channel's maximum
+    if (RAIL_SetTxPowerDbm(rail_handle, (RAIL_TxPower_t)beam.power_deci_dbm) != RAIL_STATUS_NO_ERROR)
     {
       // The transmit must happen at the power the host requested
       return TX_RESULT_INVALID_PARAM;

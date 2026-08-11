@@ -76,10 +76,10 @@ void uart_transmit_byte(uint8_t byte);
 /// @param flags Bitmask of TRANSMIT_FLAG_*
 void radio_transmit(uint8_t channel, int16_t power_deci_dbm, uint8_t flags, uint8_t *data, uint32_t len);
 /// @brief Start a wakeup beam that repeats data back to back for fragment_duration_ms per fragment
-/// @param power_dbm Transmit power in dBm, coerced by RAIL to the channel's maximum
+/// @param power_deci_dbm Transmit power in deci-dBm, coerced by RAIL to the channel's maximum
 /// @param fragment_period_ms Spacing between fragment starts, ignored when num_fragments is 1
 /// @param channels Channel per fragment, indexed by the fragment number modulo num_channels
-void radio_transmit_beam(RAIL_Handle_t rail_handle, int8_t power_dbm, uint8_t num_fragments, uint16_t fragment_duration_ms, uint16_t fragment_period_ms, uint8_t num_channels, const uint8_t *channels, const uint8_t *data, uint8_t data_len);
+void radio_transmit_beam(RAIL_Handle_t rail_handle, int16_t power_deci_dbm, uint8_t num_fragments, uint16_t fragment_duration_ms, uint16_t fragment_period_ms, uint8_t num_channels, const uint8_t *channels, const uint8_t *data, uint8_t data_len);
 /// @brief Stop an ongoing beam and return the radio to RX
 void radio_abort_beam(RAIL_Handle_t rail_handle);
 /// @brief Change the region of the radio

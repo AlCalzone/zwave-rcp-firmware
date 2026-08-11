@@ -157,20 +157,20 @@ void handle_cmd_transmit_beam(RAIL_Handle_t rail_handle, uint8_t *payload, uint8
 	// ZW -> HOST: TX_RESULT
 	// ZW -> HOST (callback): TX_RESULT
 
-	if (len < 9)
+	if (len < 10)
 	{
-		// The header takes 7 bytes, followed by at least one channel and one data byte
+		// The header takes 8 bytes, followed by at least one channel and one data byte
 		respond_cmd_transmit_beam(TX_RESULT_INVALID_PARAM);
 		return;
 	}
 
-	int8_t power_dbm = (int8_t)payload[0];
-	uint8_t num_fragments = payload[1];
-	uint16_t fragment_duration_ms = ((uint16_t)payload[2] << 8) | payload[3];
-	uint16_t fragment_period_ms = ((uint16_t)payload[4] << 8) | payload[5];
-	uint8_t num_channels = payload[6];
+	int16_t power_deci_dbm = (int16_t)(((uint16_t)payload[0] << 8) | payload[1]);
+	uint8_t num_fragments = payload[2];
+	uint16_t fragment_duration_ms = ((uint16_t)payload[3] << 8) | payload[4];
+	uint16_t fragment_period_ms = ((uint16_t)payload[5] << 8) | payload[6];
+	uint8_t num_channels = payload[7];
 
-	if (num_channels == 0 || len < 7 + num_channels + 1)
+	if (num_channels == 0 || len < 8 + num_channels + 1)
 	{
 		respond_cmd_transmit_beam(TX_RESULT_INVALID_PARAM);
 		return;
@@ -178,14 +178,14 @@ void handle_cmd_transmit_beam(RAIL_Handle_t rail_handle, uint8_t *payload, uint8
 
 	radio_transmit_beam(
 		rail_handle,
-		power_dbm,
+		power_deci_dbm,
 		num_fragments,
 		fragment_duration_ms,
 		fragment_period_ms,
 		num_channels,
-		&payload[7],
-		&payload[7 + num_channels],
-		len - 7 - num_channels);
+		&payload[8],
+		&payload[8 + num_channels],
+		len - 8 - num_channels);
 }
 
 void respond_cmd_transmit_beam(tx_result_t result)

@@ -120,7 +120,7 @@ void respond_cmd_transmit(tx_result_t result);
 void callback_cmd_transmit(tx_result_t result);
 
 /// @brief Handle a request to transmit a wakeup beam
-/// HOST -> ZW: TX_POWER (int8, dBm, or TX_POWER_UNCHANGED) | NUM_FRAGMENTS | FRAGMENT_DURATION_MS (u16 BE) | FRAGMENT_PERIOD_MS (u16 BE) | NUM_CHANNELS | ...CHANNELS | ...DATA
+/// HOST -> ZW: TX_POWER (int16 BE, deci-dBm, or TX_POWER_UNCHANGED) | NUM_FRAGMENTS | FRAGMENT_DURATION_MS (u16 BE) | FRAGMENT_PERIOD_MS (u16 BE) | NUM_CHANNELS | ...CHANNELS | ...DATA
 /// ZW -> HOST: TX_RESULT
 /// ZW -> HOST (callback): TX_RESULT
 ///
