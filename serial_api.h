@@ -107,8 +107,18 @@ typedef struct {
 	zwave_baudrate_t baud;
 } channel_info_t;
 
+/// @brief Handle a request for the firmware and radio library versions
+/// HOST -> ZW: ()
+/// ZW -> HOST: VER_MAJOR | VER_MINOR | VER_PATCH | LIB_TYPE | LIB_MAJOR | LIB_MINOR | LIB_PATCH | LEN_BITMASK | FUNC_ID_BITMASK
 void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len);
 
+/// @brief Handle a request to configure the radio
+/// SET_REGION:
+///   HOST -> ZW: SET_REGION | REGION | [CHANNEL_CFG]
+///   ZW -> HOST: SET_REGION | RESULT | [NUM_CHANNELS | CH_1_FREQ (32 bit) | CH_1_BAUD | ... | CH_N_FREQ (32 bit) | CH_N_BAUD]
+/// GET_REGION:
+///   HOST -> ZW: GET_REGION
+///   ZW -> HOST: GET_REGION | REGION | CHANNEL_CFG | NUM_CHANNELS | CH_1_FREQ (32 bit) | CH_1_BAUD | ... | CH_N_FREQ (32 bit) | CH_N_BAUD
 void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len);
 
 /// @brief Handle a transmit request
@@ -139,6 +149,8 @@ void callback_cmd_transmit_beam(tx_result_t result);
 /// ZW -> HOST: 1
 void handle_cmd_abort_beam(RAIL_Handle_t rail_handle);
 
+/// @brief Report a received frame to the host
+/// ZW -> HOST (callback): LEN | ...DATA | RSSI | LQI | CHANNEL
 void notify_receive(uint8_t *data, uint8_t len, int8_t rssi, uint8_t lqi, uint8_t channel);
 
 #endif

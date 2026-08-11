@@ -666,7 +666,8 @@ void radio_sync_active_region(RAIL_Handle_t rail_handle)
   zwave_channel_cfg_t channel_cfg;
   const RAIL_ZWAVE_RegionConfig_t *region_config = resolve_active_region(rail_handle, &region, &channel_cfg);
 
-  // A running beam addresses channels of the region it was started in
+  // A region change invalidates the channel list a running beam addresses, so
+  // the beam must end before the new region takes effect
   if (beam_active)
   {
     beam_end(rail_handle, TX_RESULT_ABORTED);
@@ -682,11 +683,17 @@ void radio_sync_active_region(RAIL_Handle_t rail_handle)
   region_num_channels = 0;
   export_channel_info(region_config, &region_num_channels, channels);
 
+  // G.9959 Table 7-3 gives channel configuration 3 three channels, all at
+  // 100 kbps. Every other configuration mixes data rates or channel counts.
+  region_is_channel_cfg_3 = (region_num_channels == 3);
   for (uint8_t i = 0; i < region_num_channels; i++)
   {
     region_channel_baud[i] = channels[i].baud;
+    if (channels[i].baud != ZWAVE_BAUD_100k)
+    {
+      region_is_channel_cfg_3 = false;
+    }
   }
-  region_is_channel_cfg_3 = (region == REGION_JP || region == REGION_KR);
 
   // Dwell times and the number of hopped channels differ per region
   init_rx_channel_hopping(rail_handle, region_num_channels);
@@ -787,7 +794,16 @@ static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len
   }
 }
 
-void radio_transmit_beam(RAIL_Handle_t rail_handle, int16_t power_deci_dbm, uint8_t num_fragments, uint16_t fragment_duration_ms, uint16_t fragment_period_ms, uint8_t num_channels, const uint8_t *channels, const uint8_t *data, uint8_t data_len)
+void radio_transmit_beam(
+    RAIL_Handle_t rail_handle,
+    int16_t power_deci_dbm,
+    uint8_t num_fragments,
+    uint16_t fragment_duration_ms,
+    uint16_t fragment_period_ms,
+    uint8_t num_channels,
+    const uint8_t *channels,
+    const uint8_t *data,
+    uint8_t data_len)
 {
   if (out_packet_len > 0 || tx_in_flight || rail_packet_sent || tx_error != 0 || beam_active)
   {
@@ -1180,31 +1196,25 @@ static void handle_received_packet(RAIL_Handle_t rail_handle)
 {
   RAIL_RxPacketInfo_t packet_info;
   RAIL_RxPacketDetails_t packet_details;
-  RAIL_Status_t packet_status;
-  RAIL_Status_t rail_status;
 
-  if (rx_packet_handle == RAIL_RX_PACKET_HANDLE_INVALID)
-  {
-  }
   rx_packet_handle = RAIL_GetRxPacketInfo(rail_handle, RAIL_RX_PACKET_HANDLE_OLDEST_COMPLETE, &packet_info);
   if (rx_packet_handle == RAIL_RX_PACKET_HANDLE_INVALID)
   {
+    return;
   }
-  if (rx_packet_handle != RAIL_RX_PACKET_HANDLE_INVALID)
+
+  // The RSSI, LQI and channel the host is told about come from the details, so
+  // a packet whose details are unavailable is dropped
+  if (RAIL_GetRxPacketDetails(rail_handle, rx_packet_handle, &packet_details) != RAIL_STATUS_NO_ERROR)
   {
-    packet_status = RAIL_GetRxPacketDetails(rail_handle, rx_packet_handle, &packet_details);
-    if (packet_status != RAIL_STATUS_NO_ERROR)
-    {
-    }
-
-    uint16_t packet_size = packet_info.packetBytes;
-    RAIL_CopyRxPacket(rx_fifo, &packet_info);
-
-    notify_receive(rx_fifo, (uint8_t)packet_size, packet_details.rssi, packet_details.lqi, (uint8_t)packet_details.channel & 0xff);
-
-    rail_status = RAIL_ReleaseRxPacket(rail_handle, rx_packet_handle);
-    if (rail_status != RAIL_STATUS_NO_ERROR)
-    {
-    }
+    RAIL_ReleaseRxPacket(rail_handle, rx_packet_handle);
+    return;
   }
+
+  uint16_t packet_size = packet_info.packetBytes;
+  RAIL_CopyRxPacket(rx_fifo, &packet_info);
+
+  notify_receive(rx_fifo, (uint8_t)packet_size, packet_details.rssi, packet_details.lqi, (uint8_t)packet_details.channel & 0xff);
+
+  RAIL_ReleaseRxPacket(rail_handle, rx_packet_handle);
 }
