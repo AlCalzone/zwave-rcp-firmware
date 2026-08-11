@@ -107,19 +107,25 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 	}
 }
 
-// HOST -> ZW: HOME_ID (4 bytes) | ...DATA
-// ZW -> HOST: QUEUE_RESULT | [RAIL_STATUS]
-// ZW -> HOST: TX_RESULT | [RAIL_STATUS]
-
 void handle_cmd_transmit(uint8_t *payload, uint8_t len)
 {
-	// HOST -> ZW: Channel | HOME_ID (4 bytes) | ...DATA
-	// ZW -> HOST: QUEUE_RESULT | [RAIL_STATUS]
+	// HOST -> ZW: CHANNEL | TX_POWER (int16 BE, deci-dBm, or TX_POWER_UNCHANGED) | FLAGS | ...DATA
+	// ZW -> HOST: TX_RESULT
+	// ZW -> HOST (callback): TX_RESULT
 
-	// For now simply forward the frame to the radio. We'll figure out if
-	// we need to do anything else later.
+	if (len < 5)
+	{
+		// The header takes 4 bytes, and there has to be something to transmit
+		respond_cmd_transmit(TX_RESULT_INVALID_PARAM);
+		return;
+	}
+
 	uint8_t channel = payload[0];
-	radio_transmit(channel, &payload[1], len - 1);
+	int16_t power_deci_dbm = (int16_t)(((uint16_t)payload[1] << 8) | payload[2]);
+	// Undefined flags are reserved and must be ignored
+	uint8_t flags = payload[3];
+
+	radio_transmit(channel, power_deci_dbm, flags, &payload[4], len - 4);
 }
 
 void respond_cmd_transmit(tx_result_t result)

@@ -60,4 +60,7 @@ RAIL_Handle_t app_init(void);
 void initGPIO(void);
 void initEUSART0(void);
 
+/// @brief Configure and enable RX channel hopping over the first num_channels channels of the active region
+void init_rx_channel_hopping(RAIL_Handle_t rail_handle, uint8_t num_channels);
+
 #endif  // APP_INIT_H

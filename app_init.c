@@ -67,7 +67,6 @@ uint32_t channelHoppingBuffer[CHANNEL_HOPPING_BUFFER_SIZE];
 RAIL_RxChannelHoppingConfig_t channelHoppingConfig = {
   .buffer = channelHoppingBuffer,
   .bufferLength = CHANNEL_HOPPING_BUFFER_SIZE,
-  .numberOfChannels = CHANNEL_HOPPING_NUMBER_OF_CHANNELS,
   .entries = channelHoppingEntries
 };
 
@@ -102,7 +101,9 @@ RAIL_Handle_t app_init(void)
   // Get RAIL handle, used later by the application
   RAIL_Handle_t rail_handle = sl_rail_util_get_handle(SL_RAIL_UTIL_HANDLE_INST0);
   set_up_tx_fifo(rail_handle);
-  init_rx_channel_hopping(rail_handle);
+  // The RAIL util config already applied a region during startup. Adopt its
+  // channel setup so transmit validation matches from the first command on.
+  radio_sync_active_region(rail_handle);
 
   return rail_handle;
 }
@@ -142,7 +143,9 @@ void initEUSART0(void)
   NVIC_EnableIRQ(EUSART0_TX_IRQn);
 }
 
-void init_rx_channel_hopping(RAIL_Handle_t rail_handle) {
+void init_rx_channel_hopping(RAIL_Handle_t rail_handle, uint8_t num_channels) {
+  channelHoppingConfig.numberOfChannels = num_channels;
+
   // Force the radio into idle mode
   RAIL_Status_t status = RAIL_Idle(rail_handle, RAIL_IDLE_ABORT, false);
   if (status != RAIL_STATUS_NO_ERROR) {

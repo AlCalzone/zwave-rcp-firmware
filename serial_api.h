@@ -55,6 +55,13 @@ typedef enum
 	TX_RESULT_COMPLETED = 0xff,
 } tx_result_t;
 
+/// TX_POWER sentinel meaning the radio keeps whatever power it is set to.
+/// 3276.7 dBm is not a valid power level in the Z-Wave power tables.
+#define TX_POWER_UNCHANGED 0x7fff
+
+/// Transmit with CCA instead of transmitting right away
+#define TRANSMIT_FLAG_CCA 0x01
+
 typedef enum {
 	SETUP_RADIO_CMD_SET_REGION = 0x01,
 	SETUP_RADIO_CMD_GET_REGION = 0x02,
@@ -99,6 +106,10 @@ void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len);
 
 void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len);
 
+/// @brief Handle a transmit request
+/// HOST -> ZW: CHANNEL | TX_POWER (int16 BE, deci-dBm, or TX_POWER_UNCHANGED) | FLAGS | ...DATA
+/// ZW -> HOST: TX_RESULT
+/// ZW -> HOST (callback): TX_RESULT
 void handle_cmd_transmit(uint8_t *payload, uint8_t len);
 void respond_cmd_transmit(tx_result_t result);
 void callback_cmd_transmit(tx_result_t result);
