@@ -30,11 +30,11 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # SLC CLI ships no JRE of its own and falls back to `java` on the PATH.
       - name: Install JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -108,50 +108,50 @@ jobs:
           echo "MAP=zwave_rcp_${{ env.SUFFIX }}.map" >> $GITHUB_ENV
 
       - name: Upload GBL
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.GBL }}
           path: upload/${{ env.GBL }}
 
       - name: Upload HEX
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.HEX }}
           path: upload/${{ env.HEX }}
 
       - name: Upload HEX SHAsum
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.HEX_SHA256 }}
           path: upload/${{ env.HEX_SHA256 }}
 
       - name: Upload HEX MD5sum
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.HEX_MD5 }}
           path: upload/${{ env.HEX_MD5 }}
 
       - name: Upload OUT
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.OUT }}
           path: upload/${{ env.OUT }}
 
       - name: Upload MAP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.MAP }}
           path: upload/${{ env.MAP }}
 
       - name: Upload firmware package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: zwave_rcp_${{ env.SUFFIX }}
           path: upload/*.*
 
       - name: Debug build failures
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: slc_cli_log
           path: ${{ env.SLC_CLI }}/bin/slc-cli/configuration/*.log
@@ -168,7 +168,7 @@ jobs:
 
     steps:
       - name: Download firmware package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ needs.build.outputs.package }}
           path: upload
