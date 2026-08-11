@@ -77,6 +77,8 @@ bool uart_rx_done = false;
 bool uart_tx_done = false;
 
 static uint8_t tx_channel = 0;
+/// Number of channels the currently configured region has
+static uint8_t region_num_channels = 0;
 static uint8_t OUT_PACKET[RAIL_FIFO_SIZE] = {0};
 static uint32_t out_packet_len = 0;
 
@@ -163,7 +165,7 @@ void app_process_action(RAIL_Handle_t rail_handle)
       rail_state = RAILS_TX;
     }
   }
-  else if (rail_state = RAILS_TX)
+  else if (rail_state == RAILS_TX)
   {
     if (out_packet_len > 0)
     {
@@ -408,6 +410,7 @@ bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_ch
     default:
       return false;
     }
+    break;
   case REGION_EU_LR:
     switch (channel_cfg)
     {
@@ -423,6 +426,7 @@ bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_ch
     default:
       return false;
     }
+    break;
 
   default:
     return false;
@@ -436,6 +440,7 @@ bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_ch
 
   // Expose the channel information to the host
   export_channel_info(region_config, num_channels, channels);
+  region_num_channels = *num_channels;
   return true;
 }
 
@@ -553,9 +558,8 @@ void radio_transmit(uint8_t channel, uint8_t *data, uint32_t len)
     respond_cmd_transmit(TX_RESULT_OVERFLOW);
     return;
   }
-  if (channel >= RAIL_NUM_ZWAVE_CHANNELS)
+  if (channel >= region_num_channels)
   {
-    // FIXME: Dynamically figure out the number of channels based on the current region
     // Invalid channel
     respond_cmd_transmit(TX_RESULT_INVALID_CHANNEL);
     return;
