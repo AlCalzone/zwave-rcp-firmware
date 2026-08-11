@@ -789,9 +789,10 @@ static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len
 
 void radio_transmit_beam(RAIL_Handle_t rail_handle, int16_t power_deci_dbm, uint8_t num_fragments, uint16_t fragment_duration_ms, uint16_t fragment_period_ms, uint8_t num_channels, const uint8_t *channels, const uint8_t *data, uint8_t data_len)
 {
-  if (out_packet_len > 0 || tx_in_flight || beam_active)
+  if (out_packet_len > 0 || tx_in_flight || rail_packet_sent || tx_error != 0 || beam_active)
   {
-    // There is already a packet in the buffer or on the air
+    // There is already a packet in the buffer or on the air, or a completed
+    // transmit the state machine has not reported to the host yet
     respond_cmd_transmit_beam(TX_RESULT_BUSY);
     return;
   }
