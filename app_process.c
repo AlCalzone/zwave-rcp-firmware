@@ -836,12 +836,22 @@ static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len
 {
   if (tx_num_replacements > 0)
   {
-    // The only replacement source so far is the noise floor on the TX channel,
-    // so a single measurement serves every replacement. A failed measurement
-    // patches "RSSI not available", and the transmit still goes out
-    int8_t noise = radio_measure_noise_floor(rail_handle, tx_channel);
+    // One measurement serves every noise floor replacement. A failed
+    // measurement patches "RSSI not available", and the transmit still goes out
+    int8_t noise = NOISE_FLOOR_NOT_AVAILABLE;
+    bool noise_measured = false;
     for (uint8_t i = 0; i < tx_num_replacements; i++)
     {
+      // Sources other than the noise floor need their own measurement here
+      if (tx_replacements[2 * i + 1] != REPLACEMENT_SOURCE_NOISE_FLOOR)
+      {
+        continue;
+      }
+      if (!noise_measured)
+      {
+        noise = radio_measure_noise_floor(rail_handle, tx_channel);
+        noise_measured = true;
+      }
       data[tx_replacements[2 * i]] = (uint8_t)noise;
     }
     tx_num_replacements = 0;
