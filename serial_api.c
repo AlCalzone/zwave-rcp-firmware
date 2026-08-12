@@ -116,10 +116,16 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 		RAIL_TxPowerMode_t mode = pa_config.mode;
 		RAIL_TxPowerLevel_t min_level = 0;
 		RAIL_TxPowerLevel_t max_level = 0;
-		RAIL_SupportsTxPowerModeAlt(rail_handle, &mode, &max_level, &min_level);
+		int16_t min_power = 0;
+		int16_t max_power = 0;
 
-		int16_t min_power = RAIL_ConvertRawToDbm(rail_handle, mode, min_level);
-		int16_t max_power = RAIL_ConvertRawToDbm(rail_handle, mode, max_level);
+		// RAIL fills in the levels only when it supports the mode. An
+		// unsupported mode reports an empty 0 dBm range
+		if (RAIL_SupportsTxPowerModeAlt(rail_handle, &mode, &max_level, &min_level))
+		{
+			min_power = RAIL_ConvertRawToDbm(rail_handle, mode, min_level);
+			max_power = RAIL_ConvertRawToDbm(rail_handle, mode, max_level);
+		}
 
 		uint8_t resp[5] = {
 			subcmd,
