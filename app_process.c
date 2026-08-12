@@ -770,6 +770,12 @@ void radio_transmit(uint8_t channel, int16_t power_deci_dbm, uint8_t flags, uint
 /// Returns the averaged RSSI in dBm, clamped to the range the LR MPDU RSSI
 /// fields allow, or NOISE_FLOOR_NOT_AVAILABLE when no measurement could be
 /// taken. The caller restarts RX or follows up with a transmit.
+///
+/// Busy-waits for the averaging window, so this blocks the main loop for
+/// NOISE_MEASURE_TIME_US and at most NOISE_MEASURE_TIMEOUT_MARGIN_US beyond
+/// it. A transmit that patches the reading into the frame cannot proceed
+/// without it. Both UART directions run off interrupts and the RX FIFO holds
+/// UART_RX_FIFO_SIZE bytes, which covers the stall at the configured baud rate.
 static int8_t radio_measure_noise_floor(RAIL_Handle_t rail_handle, uint8_t channel)
 {
   // RSSI averaging requires an idle radio
@@ -777,6 +783,7 @@ static int8_t radio_measure_noise_floor(RAIL_Handle_t rail_handle, uint8_t chann
 
   if (RAIL_StartAverageRssi(rail_handle, channel, NOISE_MEASURE_TIME_US, NULL) != RAIL_STATUS_NO_ERROR)
   {
+    RAIL_YieldRadio(rail_handle);
     return NOISE_FLOOR_NOT_AVAILABLE;
   }
 

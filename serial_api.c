@@ -170,7 +170,8 @@ void handle_cmd_transmit(uint8_t *payload, uint8_t len)
 	// ZW -> HOST (callback): TX_RESULT
 	//
 	// Replacement arguments are present exactly when FLAGS carries
-	// TRANSMIT_FLAG_REPLACEMENTS. Each one patches DATA[OFFSET] with the
+	// TRANSMIT_FLAG_REPLACEMENTS, and NUM_REPLACEMENTS may be 0 so a host can
+	// always send the section. Each one patches DATA[OFFSET] with the
 	// measurement SOURCE names, taken right before the transmit. Only bytes the
 	// host explicitly lists here are replaced.
 
@@ -195,8 +196,7 @@ void handle_cmd_transmit(uint8_t *payload, uint8_t len)
 		num_replacements = payload[4];
 		data_start = 5 + 2 * num_replacements;
 		if (
-			num_replacements == 0
-			|| num_replacements > TRANSMIT_MAX_REPLACEMENTS
+			num_replacements > TRANSMIT_MAX_REPLACEMENTS
 			// At least one data byte must follow the replacement list
 			|| len < (uint8_t)(data_start + 1))
 		{
