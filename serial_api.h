@@ -70,6 +70,7 @@ typedef enum
 typedef enum {
 	SETUP_RADIO_CMD_SET_REGION = 0x01,
 	SETUP_RADIO_CMD_GET_REGION = 0x02,
+	SETUP_RADIO_CMD_GET_TX_POWER_RANGE = 0x03,
 } setup_radio_cmd_t;
 
 typedef enum {
