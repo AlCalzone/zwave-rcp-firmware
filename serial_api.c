@@ -106,6 +106,32 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 
 		break;
 	}
+	case SETUP_RADIO_CMD_GET_TX_POWER_RANGE:
+	{
+		// HOST -> ZW: GET_TX_POWER_RANGE
+		// ZW -> HOST: GET_TX_POWER_RANGE | MIN_POWER (int16 BE, deci-dBm) | MAX_POWER (int16 BE, deci-dBm)
+		RAIL_TxPowerConfig_t pa_config = {0};
+		RAIL_GetTxPowerConfig(rail_handle, &pa_config);
+
+		RAIL_TxPowerMode_t mode = pa_config.mode;
+		RAIL_TxPowerLevel_t min_level = 0;
+		RAIL_TxPowerLevel_t max_level = 0;
+		RAIL_SupportsTxPowerModeAlt(rail_handle, &mode, &max_level, &min_level);
+
+		int16_t min_power = RAIL_ConvertRawToDbm(rail_handle, mode, min_level);
+		int16_t max_power = RAIL_ConvertRawToDbm(rail_handle, mode, max_level);
+
+		uint8_t resp[5] = {
+			subcmd,
+			(min_power >> 8) & 0xff,
+			min_power & 0xff,
+			(max_power >> 8) & 0xff,
+			max_power & 0xff,
+		};
+		uart_transmit_frame(FRAME_TYPE_RESP, FUNC_ID_SETUP_RADIO, resp, sizeof(resp));
+
+		break;
+	}
 	}
 }
 
