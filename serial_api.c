@@ -29,6 +29,7 @@ void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len)
 			(1 << (FUNC_ID_RECEIVE - 1)) |
 			(1 << (FUNC_ID_TRANSMIT_BEAM - 1)) |
 			(1 << (FUNC_ID_ABORT_BEAM - 1)) |
+			(1 << (FUNC_ID_MEASURE_NOISE_FLOOR - 1)) |
 			0};
 
 	uart_transmit_frame(FRAME_TYPE_RESP, FUNC_ID_GET_FIRMWARE_INFO, resp, sizeof(resp));
@@ -143,9 +144,14 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 
 void handle_cmd_transmit(uint8_t *payload, uint8_t len)
 {
-	// HOST -> ZW: CHANNEL | TX_POWER (int16 BE, deci-dBm, or TX_POWER_UNCHANGED) | FLAGS | ...DATA
+	// HOST -> ZW: CHANNEL | TX_POWER (int16 BE, deci-dBm, or TX_POWER_UNCHANGED) | FLAGS | [NUM_REPLACEMENTS | (OFFSET | SOURCE)*] | ...DATA
 	// ZW -> HOST: TX_RESULT
 	// ZW -> HOST (callback): TX_RESULT
+	//
+	// Replacement arguments are present exactly when FLAGS carries
+	// TRANSMIT_FLAG_REPLACEMENTS. Each one patches DATA[OFFSET] with the
+	// measurement SOURCE names, taken right before the transmit. Only bytes the
+	// host explicitly lists here are replaced.
 
 	if (len < 5)
 	{
@@ -159,7 +165,39 @@ void handle_cmd_transmit(uint8_t *payload, uint8_t len)
 	// Undefined flags are reserved and must be ignored
 	uint8_t flags = payload[3];
 
-	radio_transmit(channel, power_deci_dbm, flags, &payload[4], len - 4);
+	const uint8_t *replacements = NULL;
+	uint8_t num_replacements = 0;
+	uint8_t data_start = 4;
+
+	if (flags & TRANSMIT_FLAG_REPLACEMENTS)
+	{
+		num_replacements = payload[4];
+		data_start = 5 + 2 * num_replacements;
+		if (
+			num_replacements == 0
+			|| num_replacements > TRANSMIT_MAX_REPLACEMENTS
+			// At least one data byte must follow the replacement list
+			|| len < (uint8_t)(data_start + 1))
+		{
+			respond_cmd_transmit(TX_RESULT_INVALID_PARAM);
+			return;
+		}
+		replacements = &payload[5];
+
+		uint8_t data_len = len - data_start;
+		for (uint8_t i = 0; i < num_replacements; i++)
+		{
+			uint8_t offset = replacements[2 * i];
+			uint8_t source = replacements[2 * i + 1];
+			if (offset >= data_len || source != REPLACEMENT_SOURCE_NOISE_FLOOR)
+			{
+				respond_cmd_transmit(TX_RESULT_INVALID_PARAM);
+				return;
+			}
+		}
+	}
+
+	radio_transmit(channel, power_deci_dbm, flags, &payload[data_start], len - data_start, replacements, num_replacements);
 }
 
 void respond_cmd_transmit(tx_result_t result)
@@ -262,6 +300,23 @@ void handle_cmd_abort_beam(RAIL_Handle_t rail_handle)
 	uart_transmit_frame(FRAME_TYPE_RESP, FUNC_ID_ABORT_BEAM, resp, sizeof(resp));
 
 	radio_abort_beam(rail_handle);
+}
+
+void handle_cmd_measure_noise_floor(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len)
+{
+	// HOST -> ZW: CHANNEL
+	// ZW -> HOST: NOISE_FLOOR (int8, dBm, clamped to -120..30, or 127 when
+	// no measurement could be taken: missing/invalid channel, radio busy
+	// with a transmit or beam, or the measurement itself failed)
+
+	int8_t noise = NOISE_FLOOR_NOT_AVAILABLE;
+	if (len >= 1)
+	{
+		noise = radio_measure_noise_floor_cmd(rail_handle, payload[0]);
+	}
+
+	uint8_t resp[1] = {(uint8_t)noise};
+	uart_transmit_frame(FRAME_TYPE_RESP, FUNC_ID_MEASURE_NOISE_FLOOR, resp, sizeof(resp));
 }
 
 void notify_receive(uint8_t *data, uint8_t len, int8_t rssi, uint8_t lqi, uint8_t channel)
