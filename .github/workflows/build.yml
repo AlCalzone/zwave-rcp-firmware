@@ -1,0 +1,179 @@
+name: "Build firmware"
+
+# Run this job on all pushes to master, for pull requests
+# as well as published releases
+on:
+  push:
+    branches:
+      # This avoids having duplicate builds in non-forked PRs
+      - "master"
+      - "sisdk-*"
+  release:
+    types:
+      - published
+  pull_request: {}
+
+# Cancel previous PR/branch runs when a new commit is pushed
+concurrency:
+  group: "build-firmware-${{ github.ref }}"
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    outputs:
+      package: ${{ steps.version.outputs.package }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v7
+
+      # SLC CLI ships no JRE of its own and falls back to `java` on the PATH.
+      - name: Install JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install SLT CLI
+        run: |
+          curl -o slt.zip https://www.silabs.com/documents/public/software/slt-cli-1.1.0-linux-x64.zip
+          unzip -q slt.zip -d /usr/local/bin
+          chmod +x /usr/local/bin/slt
+
+      - name: Install SDK and tools
+        run: |
+          slt --non-interactive install simplicity-sdk/2024.12.1
+          slt --non-interactive install slc-cli
+          slt --non-interactive install commander
+          slt --non-interactive install gcc-arm-none-eabi/12.2.rel1
+
+      - name: Set up tool paths
+        run: |
+          echo "SDK=$(slt where simplicity-sdk/2024.12.1)" >> $GITHUB_ENV
+          echo "TOOLCHAIN=$(slt where gcc-arm-none-eabi/12.2.rel1)" >> $GITHUB_ENV
+          echo "SLC_CLI=$(slt where slc-cli)" >> $GITHUB_ENV
+          echo "$(slt where slc-cli)" >> $GITHUB_PATH
+          echo "$(slt where commander)" >> $GITHUB_PATH
+
+      - name: Build project
+        run: tools/build.sh
+
+      - name: Check build output
+        run: ls -la build/release
+
+      - name: Determine firmware version
+        id: version
+        run: |
+          VERSION=$(tools/extract_version.sh)
+          if [ "${{ github.event_name }}" == "release" ]; then
+            SUFFIX="$VERSION"
+          else
+            COMMIT=$(git rev-parse --short ${{ github.sha }})
+            SUFFIX="${VERSION}_${COMMIT}"
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "SUFFIX=${SUFFIX}" >> $GITHUB_ENV
+          echo "package=zwave_rcp_${SUFFIX}" >> $GITHUB_OUTPUT
+
+      - name: Copy build artifacts
+        run: |
+          cp build/release/zwave_rcp.hex artifact/zwave_rcp.hex
+          cp build/release/zwave_rcp.out artifact/zwave_rcp.out
+          cp build/release/zwave_rcp.map artifact/zwave_rcp.map
+
+      - name: Compute checksums for HEX file
+        run: |
+          sha256sum artifact/zwave_rcp.hex | cut -d" " -f1 > artifact/zwave_rcp.hex.sha256
+          md5sum artifact/zwave_rcp.hex | cut -d" " -f1 > artifact/zwave_rcp.hex.md5
+
+      - name: Prepare files for upload
+        run: |
+          mkdir -p upload
+          cp artifact/zwave_rcp.gbl upload/zwave_rcp_${{ env.SUFFIX }}.gbl
+          echo "GBL=zwave_rcp_${{ env.SUFFIX }}.gbl" >> $GITHUB_ENV
+          cp artifact/zwave_rcp.hex upload/zwave_rcp_${{ env.SUFFIX }}.hex
+          echo "HEX=zwave_rcp_${{ env.SUFFIX }}.hex" >> $GITHUB_ENV
+          cp artifact/zwave_rcp.hex.sha256 upload/zwave_rcp_${{ env.SUFFIX }}.hex.sha256
+          echo "HEX_SHA256=zwave_rcp_${{ env.SUFFIX }}.hex.sha256" >> $GITHUB_ENV
+          cp artifact/zwave_rcp.hex.md5 upload/zwave_rcp_${{ env.SUFFIX }}.hex.md5
+          echo "HEX_MD5=zwave_rcp_${{ env.SUFFIX }}.hex.md5" >> $GITHUB_ENV
+          cp artifact/zwave_rcp.out upload/zwave_rcp_${{ env.SUFFIX }}.out
+          echo "OUT=zwave_rcp_${{ env.SUFFIX }}.out" >> $GITHUB_ENV
+          cp artifact/zwave_rcp.map upload/zwave_rcp_${{ env.SUFFIX }}.map
+          echo "MAP=zwave_rcp_${{ env.SUFFIX }}.map" >> $GITHUB_ENV
+
+      - name: Upload GBL
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.GBL }}
+          path: upload/${{ env.GBL }}
+
+      - name: Upload HEX
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.HEX }}
+          path: upload/${{ env.HEX }}
+
+      - name: Upload HEX SHAsum
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.HEX_SHA256 }}
+          path: upload/${{ env.HEX_SHA256 }}
+
+      - name: Upload HEX MD5sum
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.HEX_MD5 }}
+          path: upload/${{ env.HEX_MD5 }}
+
+      - name: Upload OUT
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.OUT }}
+          path: upload/${{ env.OUT }}
+
+      - name: Upload MAP
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.MAP }}
+          path: upload/${{ env.MAP }}
+
+      - name: Upload firmware package
+        uses: actions/upload-artifact@v7
+        with:
+          name: zwave_rcp_${{ env.SUFFIX }}
+          path: upload/*.*
+
+      - name: Debug build failures
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: slc_cli_log
+          path: ${{ env.SLC_CLI }}/bin/slc-cli/configuration/*.log
+
+  # Separate job so the build job, which runs code from pull requests, keeps a
+  # read-only token.
+  release:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download firmware package
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.build.outputs.package }}
+          path: upload
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          files: upload/*.*

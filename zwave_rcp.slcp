@@ -14,22 +14,26 @@ filter:
 package: Rail
 quality: production
 readme:
-- {path: readme.md}
-- {path: readme.md}
+- {path: README.md}
+- {path: README.md}
 source:
 - {path: main.c}
 - {path: app_init.c}
 - {path: app_process.c}
+- {path: serial_api.c}
 include:
 - path: .
   file_list:
   - {path: app_init.h}
   - {path: app_process.h}
+  - {path: common.h}
+  - {path: serial_api.h}
 sdk: {id: simplicity_sdk, version: 2024.12.1}
 toolchain_settings:
 - {value: debug, option: optimize}
 component:
 - {id: EFR32ZG23A020F512GM40}
+- {id: bootloader_interface}
 - {id: clock_manager}
 - {id: device_init}
 - {id: emlib_eusart}
@@ -39,11 +43,6 @@ component:
   id: rail_util_init
 - {id: rail_util_recommended}
 - {id: sl_system}
-template_contribution:
-- {name: memory_ram_start, priority: 0, value: 536870912}
-- {name: memory_ram_size, priority: 0, value: 65536}
-- {name: memory_flash_start, priority: 0, value: 134217728}
-- {name: memory_flash_size, priority: 0, value: 524288}
 requires:
 - {name: a_radio_config}
 configuration:
@@ -129,5 +128,5 @@ configuration:
 ui_hints:
   highlight:
   - {path: config/rail/radio_settings.radioconf}
-  - {path: readme.md, focus: true}
+  - {path: README.md, focus: true}
 

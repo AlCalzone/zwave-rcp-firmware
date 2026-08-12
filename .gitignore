@@ -6,3 +6,10 @@ GNU*
 .uceditor
 .projectlinkstore
 *.bak
+
+################ CI build outputs to ignore #################
+build/
+artifact/
+upload/
+/*.Makefile
+/*.mak
