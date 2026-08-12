@@ -93,7 +93,15 @@ typedef enum {
 	SETUP_RADIO_CMD_SET_REGION = 0x01,
 	SETUP_RADIO_CMD_GET_REGION = 0x02,
 	SETUP_RADIO_CMD_GET_TX_POWER_RANGE = 0x03,
+	SETUP_RADIO_CMD_GET_CAPABILITIES = 0x04,
 } setup_radio_cmd_t;
+
+/// Optional features the host queries with SETUP_RADIO_CMD_GET_CAPABILITIES.
+/// Each value is its bit position in the capability bitmask, counted from 1.
+typedef enum {
+	/// FUNC_ID_TRANSMIT honors TRANSMIT_FLAG_REPLACEMENTS
+	RADIO_CAPABILITY_TRANSMIT_REPLACEMENTS = 0x01,
+} radio_capability_t;
 
 typedef enum {
 	REGION_EU = 0,

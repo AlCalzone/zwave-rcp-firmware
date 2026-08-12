@@ -139,6 +139,27 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 
 		break;
 	}
+	case SETUP_RADIO_CMD_GET_CAPABILITIES:
+	{
+		// HOST -> ZW: GET_CAPABILITIES
+		// ZW -> HOST: GET_CAPABILITIES | BITMASK_LEN | ...BITMASK
+		//
+		// The bitmask carries the radio_capability_t values this firmware
+		// implements, so the host can tell optional features apart from the
+		// commands FUNC_ID_BITMASK already covers.
+		uint8_t capabilities[1] = {
+			0 |
+				(1 << (RADIO_CAPABILITY_TRANSMIT_REPLACEMENTS - 1)) |
+				0};
+
+		uint8_t resp[2 + sizeof(capabilities)];
+		resp[0] = subcmd;
+		resp[1] = sizeof(capabilities);
+		memcpy(&resp[2], capabilities, sizeof(capabilities));
+		uart_transmit_frame(FRAME_TYPE_RESP, FUNC_ID_SETUP_RADIO, resp, sizeof(resp));
+
+		break;
+	}
 	}
 }
 
