@@ -67,6 +67,13 @@ typedef enum
 /// A rate that carries no beam preamble length in the tables above
 #define BEAM_PREAMBLE_BITS_NONE 0
 
+/// How long the hardware averages the RSSI for a noise floor measurement
+#define NOISE_MEASURE_TIME_US 200
+
+/// Extra wait for the averaging to finish, covering the channel tuning RAIL
+/// performs before it
+#define NOISE_MEASURE_TIMEOUT_MARGIN_US 1000
+
 /// Beam frames must not carry the checksum the Z-Wave PHY normally appends.
 /// The transmit uses exactly the fixed length configured below.
 /// The beam preamble length comes from RAIL_SetTxAltPreambleLength().
@@ -82,6 +89,7 @@ static void reset_rx_fifo(uint8_t new_start);
 static void uart_handle_frame(RAIL_Handle_t rail_handle, frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint8_t len);
 static void export_channel_info(const RAIL_ZWAVE_RegionConfig_t *region_config, uint8_t *num_channels, channel_info_t *channels);
 static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len);
+static int8_t radio_measure_noise_floor(RAIL_Handle_t rail_handle, uint8_t channel);
 static uint8_t tx_result_from_events(RAIL_Events_t events);
 static uint16_t beam_preamble_bits(uint8_t channel);
 static uint8_t beam_fragment_channel(void);
@@ -121,6 +129,10 @@ static zwave_baudrate_t region_channel_baud[RAIL_NUM_ZWAVE_CHANNELS] = {0};
 static bool region_is_channel_cfg_3 = false;
 static uint8_t OUT_PACKET[RAIL_FIFO_SIZE] = {0};
 static uint32_t out_packet_len = 0;
+/// Replacements to patch into OUT_PACKET right before the transmit, as
+/// OFFSET | SOURCE pairs the transmit handler has already validated
+static uint8_t tx_replacements[2 * TRANSMIT_MAX_REPLACEMENTS] = {0};
+static uint8_t tx_num_replacements = 0;
 
 // -----------------------------------------------------------------------------
 //                                Static Variables
@@ -467,6 +479,10 @@ static void uart_handle_frame(RAIL_Handle_t rail_handle, frame_type_t frame_type
   case FUNC_ID_ABORT_BEAM:
     handle_cmd_abort_beam(rail_handle);
     break;
+
+  case FUNC_ID_MEASURE_NOISE_FLOOR:
+    handle_cmd_measure_noise_floor(rail_handle, payload, len);
+    break;
   default:
     break;
   }
@@ -716,7 +732,7 @@ static void export_channel_info(const RAIL_ZWAVE_RegionConfig_t *region_config, 
   }
 }
 
-void radio_transmit(uint8_t channel, int16_t power_deci_dbm, uint8_t flags, uint8_t *data, uint32_t len)
+void radio_transmit(uint8_t channel, int16_t power_deci_dbm, uint8_t flags, uint8_t *data, uint32_t len, const uint8_t *replacements, uint8_t num_replacements)
 {
   if (out_packet_len > 0 || tx_in_flight || rail_packet_sent || tx_error != 0 || beam_active)
   {
@@ -740,12 +756,114 @@ void radio_transmit(uint8_t channel, int16_t power_deci_dbm, uint8_t flags, uint
   tx_channel = channel;
   tx_power_deci_dbm = power_deci_dbm;
   tx_flags = flags;
+  tx_num_replacements = num_replacements;
+  if (num_replacements > 0)
+  {
+    memcpy(tx_replacements, replacements, 2 * num_replacements);
+  }
   memcpy(OUT_PACKET, data, len);
   out_packet_len = len;
 }
 
+/// @brief Measure the noise floor on a channel, leaving the radio idle
+///
+/// Returns the averaged RSSI in dBm, clamped to the range the LR MPDU RSSI
+/// fields allow, or NOISE_FLOOR_NOT_AVAILABLE when no measurement could be
+/// taken. The caller restarts RX or follows up with a transmit.
+///
+/// Busy-waits for the averaging window, so this blocks the main loop for
+/// NOISE_MEASURE_TIME_US and at most NOISE_MEASURE_TIMEOUT_MARGIN_US beyond
+/// it. A transmit that patches the reading into the frame cannot proceed
+/// without it. Both UART directions run off interrupts and the RX FIFO holds
+/// UART_RX_FIFO_SIZE bytes, which covers the stall at the configured baud rate.
+static int8_t radio_measure_noise_floor(RAIL_Handle_t rail_handle, uint8_t channel)
+{
+  // RSSI averaging requires an idle radio
+  RAIL_Idle(rail_handle, RAIL_IDLE_ABORT, true);
+
+  if (RAIL_StartAverageRssi(rail_handle, channel, NOISE_MEASURE_TIME_US, NULL) != RAIL_STATUS_NO_ERROR)
+  {
+    RAIL_YieldRadio(rail_handle);
+    return NOISE_FLOOR_NOT_AVAILABLE;
+  }
+
+  // Completing the averaging returns the radio to idle. The margin covers the
+  // channel tuning RAIL performs before the averaging window starts
+  RAIL_Time_t deadline = RAIL_GetTime() + NOISE_MEASURE_TIME_US + NOISE_MEASURE_TIMEOUT_MARGIN_US;
+  while (!RAIL_IsAverageRssiReady(rail_handle))
+  {
+    if ((int32_t)(RAIL_GetTime() - deadline) >= 0)
+    {
+      RAIL_Idle(rail_handle, RAIL_IDLE_ABORT, true);
+      RAIL_YieldRadio(rail_handle);
+      return NOISE_FLOOR_NOT_AVAILABLE;
+    }
+  }
+
+  int16_t quarter_dbm = RAIL_GetAverageRssi(rail_handle);
+  RAIL_YieldRadio(rail_handle);
+  if (quarter_dbm == RAIL_RSSI_INVALID)
+  {
+    return NOISE_FLOOR_NOT_AVAILABLE;
+  }
+
+  // Round the quarter-dBm reading to the nearest dBm
+  int16_t dbm = quarter_dbm >= 0 ? (quarter_dbm + 2) / 4 : (quarter_dbm - 2) / 4;
+  if (dbm < NOISE_FLOOR_MIN_DBM)
+  {
+    dbm = NOISE_FLOOR_MIN_DBM;
+  }
+  else if (dbm > NOISE_FLOOR_MAX_DBM)
+  {
+    dbm = NOISE_FLOOR_MAX_DBM;
+  }
+  return (int8_t)dbm;
+}
+
+int8_t radio_measure_noise_floor_cmd(RAIL_Handle_t rail_handle, uint8_t channel)
+{
+  if (out_packet_len > 0 || tx_in_flight || rail_packet_sent || tx_error != 0 || beam_active)
+  {
+    // Measuring idles the radio, which would cut the transmit or beam short
+    return NOISE_FLOOR_NOT_AVAILABLE;
+  }
+  if (channel >= region_num_channels)
+  {
+    return NOISE_FLOOR_NOT_AVAILABLE;
+  }
+
+  int8_t noise = radio_measure_noise_floor(rail_handle, channel);
+
+  // Measuring idled the radio, so return to the state that starts RX
+  rail_state = RAILS_IDLE;
+  return noise;
+}
+
 static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len)
 {
+  if (tx_num_replacements > 0)
+  {
+    // One measurement serves every noise floor replacement. A failed
+    // measurement patches "RSSI not available", and the transmit still goes out
+    int8_t noise = NOISE_FLOOR_NOT_AVAILABLE;
+    bool noise_measured = false;
+    for (uint8_t i = 0; i < tx_num_replacements; i++)
+    {
+      // Sources other than the noise floor need their own measurement here
+      if (tx_replacements[2 * i + 1] != REPLACEMENT_SOURCE_NOISE_FLOOR)
+      {
+        continue;
+      }
+      if (!noise_measured)
+      {
+        noise = radio_measure_noise_floor(rail_handle, tx_channel);
+        noise_measured = true;
+      }
+      data[tx_replacements[2 * i]] = (uint8_t)noise;
+    }
+    tx_num_replacements = 0;
+  }
+
   if (tx_power_deci_dbm != TX_POWER_UNCHANGED)
   {
     // RAIL coerces the requested power against the channel the radio is tuned

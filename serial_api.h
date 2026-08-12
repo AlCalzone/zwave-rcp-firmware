@@ -19,6 +19,7 @@ typedef enum
 	FUNC_ID_RECEIVE = 0x04,
 	FUNC_ID_TRANSMIT_BEAM = 0x05,
 	FUNC_ID_ABORT_BEAM = 0x06,
+	FUNC_ID_MEASURE_NOISE_FLOOR = 0x07,
 } func_id_t;
 
 typedef enum
@@ -63,6 +64,27 @@ typedef enum
 /// Perform a clear channel assessment before transmitting
 #define TRANSMIT_FLAG_CCA 0x01
 
+/// Replacement arguments follow the FLAGS byte of FUNC_ID_TRANSMIT
+#define TRANSMIT_FLAG_REPLACEMENTS 0x02
+
+/// Measurements FUNC_ID_TRANSMIT can patch into the frame right before transmitting
+typedef enum {
+	/// Noise floor on the TX channel, encoded like FUNC_ID_MEASURE_NOISE_FLOOR
+	REPLACEMENT_SOURCE_NOISE_FLOOR = 0x00,
+} replacement_source_t;
+
+/// Most replacements a single FUNC_ID_TRANSMIT may carry
+#define TRANSMIT_MAX_REPLACEMENTS 4
+
+/// Z-Wave Long Range PHY and MAC Layer Specification (2023.07.03), Table 6-23
+/// and Table 6-27 both define 127 as "RSSI not available"
+#define NOISE_FLOOR_NOT_AVAILABLE 127
+
+/// Z-Wave Long Range PHY and MAC Layer Specification (2023.07.03), Table 6-27:
+/// an RSSI field carries an "RSSI value in dBm" between these bounds
+#define NOISE_FLOOR_MIN_DBM (-120)
+#define NOISE_FLOOR_MAX_DBM 30
+
 /// Longest beam frame content the host may hand to FUNC_ID_TRANSMIT_BEAM.
 /// G.9959 §8.1.3.10 beam frames carry 3 bytes, Z-Wave LR beam frames 4.
 #define BEAM_DATA_MAX_LEN 8
@@ -71,7 +93,15 @@ typedef enum {
 	SETUP_RADIO_CMD_SET_REGION = 0x01,
 	SETUP_RADIO_CMD_GET_REGION = 0x02,
 	SETUP_RADIO_CMD_GET_TX_POWER_RANGE = 0x03,
+	SETUP_RADIO_CMD_GET_CAPABILITIES = 0x04,
 } setup_radio_cmd_t;
+
+/// Optional features the host queries with SETUP_RADIO_CMD_GET_CAPABILITIES.
+/// Each value is its bit position in the capability bitmask, counted from 1.
+typedef enum {
+	/// FUNC_ID_TRANSMIT honors TRANSMIT_FLAG_REPLACEMENTS
+	RADIO_CAPABILITY_TRANSMIT_REPLACEMENTS = 0x01,
+} radio_capability_t;
 
 typedef enum {
 	REGION_EU = 0,
@@ -126,6 +156,9 @@ void callback_cmd_transmit_beam(tx_result_t result);
 
 /// @brief Handle a request to stop an ongoing beam
 void handle_cmd_abort_beam(RAIL_Handle_t rail_handle);
+
+/// @brief Handle a request to measure the noise floor on a channel
+void handle_cmd_measure_noise_floor(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len);
 
 /// @brief Report a received frame to the host
 void notify_receive(uint8_t *data, uint8_t len, int8_t rssi, uint8_t lqi, uint8_t channel);

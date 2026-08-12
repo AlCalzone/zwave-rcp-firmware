@@ -74,7 +74,10 @@ void uart_transmit_byte(uint8_t byte);
 /// @brief Queue raw data for transmission over radio
 /// @param power_deci_dbm Transmit power in deci-dBm, coerced by RAIL to the channel's maximum
 /// @param flags Bitmask of TRANSMIT_FLAG_*
-void radio_transmit(uint8_t channel, int16_t power_deci_dbm, uint8_t flags, uint8_t *data, uint32_t len);
+/// @param replacements Validated OFFSET | SOURCE pairs to patch into data right before the transmit
+void radio_transmit(uint8_t channel, int16_t power_deci_dbm, uint8_t flags, uint8_t *data, uint32_t len, const uint8_t *replacements, uint8_t num_replacements);
+/// @brief Measure the noise floor on a channel and restart RX, returning 127 when the radio is busy or the measurement failed
+int8_t radio_measure_noise_floor_cmd(RAIL_Handle_t rail_handle, uint8_t channel);
 /// @brief Start a wakeup beam that repeats data back to back for fragment_duration_ms per fragment
 /// @param power_deci_dbm Transmit power in deci-dBm, coerced by RAIL to the channel's maximum
 /// @param fragment_period_ms Spacing between fragment starts, ignored when num_fragments is 1
