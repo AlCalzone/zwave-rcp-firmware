@@ -563,7 +563,19 @@ bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_ch
     return false;
   }
 
-  RAIL_Status_t status = RAIL_ZWAVE_ConfigRegion(rail_handle, region_config);
+  if (out_packet_len > 0 || tx_in_flight || rail_packet_sent || tx_error != 0 || beam_active)
+  {
+    return false;
+  }
+
+  // RAIL requires an idle radio before changing regions.
+  RAIL_Status_t status = RAIL_Idle(rail_handle, RAIL_IDLE_ABORT, true);
+  if (status != RAIL_STATUS_NO_ERROR)
+  {
+    return false;
+  }
+
+  status = RAIL_ZWAVE_ConfigRegion(rail_handle, region_config);
   if (status != RAIL_STATUS_NO_ERROR)
   {
     return false;
