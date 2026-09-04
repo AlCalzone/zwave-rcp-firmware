@@ -43,6 +43,18 @@ echo "Using toolchain: $TOOLCHAIN"
 # app_init.c includes.
 cp config/pin_config.h build/config/pin_config.h
 
+# slc-cli occasionally runs the radio configurator a second time right after the
+# first pass and leaves build/autogen without the files it just reported as
+# created. The makefile then fails with "No rule to make target
+# 'autogen/rail_config.c'". Fall back to the committed copies that Simplicity
+# Studio generated from the same radioconf with the same SDK.
+for f in rail_config.c rail_config.h; do
+	if [ ! -f "build/autogen/$f" ]; then
+		echo "WARNING: slc did not leave autogen/$f behind, using the committed copy"
+		cp "autogen/$f" "build/autogen/$f"
+	fi
+done
+
 # Build from inside build/ so COPIED_SDK_PATH resolves, and pin OUTPUT_DIR to
 # build/release so mkgbl.sh and the workflow find the binaries there.
 make -C build -B -f "$PROJ_NAME.Makefile" release \
