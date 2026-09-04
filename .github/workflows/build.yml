@@ -156,11 +156,74 @@ jobs:
           name: slc_cli_log
           path: ${{ env.SLC_CLI }}/bin/slc-cli/configuration/*.log
 
-  # Separate job so the build job, which runs code from pull requests, keeps a
+  build-trident:
+    runs-on: ubuntu-latest
+
+    outputs:
+      package: ${{ steps.version.outputs.package }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v7
+
+      # The SDK build system generates code with Python and signs the images
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi cmake ninja-build openssl
+          python -m pip install --upgrade pip
+          python -m pip install jinja2 pyyaml cryptography pyelftools==0.32 ecdsa
+
+      - name: Fetch Trident IoT SDK
+        run: tools/fetch_trident_sdk.sh
+
+      - name: Build project
+        run: tools/build_trident.sh
+
+      - name: Determine firmware version
+        id: version
+        run: |
+          VERSION=$(tools/extract_version.sh)
+          if [ "${{ github.event_name }}" == "release" ]; then
+            SUFFIX="$VERSION"
+          else
+            COMMIT=$(git rev-parse --short ${{ github.sha }})
+            SUFFIX="${VERSION}_${COMMIT}"
+          fi
+          echo "SUFFIX=${SUFFIX}" >> $GITHUB_ENV
+          echo "package=zwave_rcp_trident_${SUFFIX}" >> $GITHUB_OUTPUT
+
+      # One set of files per board directory under trident/hardware
+      - name: Prepare files for upload
+        run: |
+          mkdir -p upload
+          for hex in artifact/trident/*_signed_combined.hex; do
+            name=$(basename "${hex%_signed_combined.hex}")
+            cp "$hex" "upload/${name}_${SUFFIX}.hex"
+            sha256sum "$hex" | cut -d" " -f1 > "upload/${name}_${SUFFIX}.hex.sha256"
+            md5sum "$hex" | cut -d" " -f1 > "upload/${name}_${SUFFIX}.hex.md5"
+            cp "artifact/trident/${name}.ota" "upload/${name}_${SUFFIX}.ota"
+            cp "artifact/trident/${name}.elf" "upload/${name}_${SUFFIX}.elf"
+            cp "artifact/trident/${name}.map" "upload/${name}_${SUFFIX}.map"
+          done
+          ls -la upload
+
+      - name: Upload firmware package
+        uses: actions/upload-artifact@v7
+        with:
+          name: zwave_rcp_trident_${{ env.SUFFIX }}
+          path: upload/*.*
+
+  # Separate job so the build jobs, which run code from pull requests, keep a
   # read-only token.
   release:
     if: github.event_name == 'release'
-    needs: build
+    needs: [build, build-trident]
     runs-on: ubuntu-latest
 
     permissions:
@@ -171,6 +234,12 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ${{ needs.build.outputs.package }}
+          path: upload
+
+      - name: Download Trident IoT firmware package
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.build-trident.outputs.package }}
           path: upload
 
       - name: Upload to release

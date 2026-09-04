@@ -1,26 +1,29 @@
 #include <stdint.h>
+#include <string.h>
 #include "serial_api.h"
 #include "common.h"
-#include "app_process.h"
-#include "rail.h"
-#include "rail_zwave.h"
+#include "radio.h"
+#include "serial_link.h"
 
 void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len)
 {
 	// HOST -> ZW: ()
 	// ZW -> HOST: VER_MAJOR | VER_MINOR | VER_PATCH | LIB_TYPE | LIB_MAJOR | LIB_MINOR | LIB_PATCH | LEN_BITMASK | FUNC_ID_BITMASK
 
-	RAIL_Version_t rail_version = {0};
-	RAIL_GetVersion(&rail_version, false);
+	radio_library_t library = RADIO_LIBRARY_RAIL;
+	uint8_t lib_major = 0;
+	uint8_t lib_minor = 0;
+	uint8_t lib_patch = 0;
+	radio_get_library_info(&library, &lib_major, &lib_minor, &lib_patch);
 
 	uint8_t resp[9] = {
 		FIRMWARE_VERSION_MAJOR,
 		FIRMWARE_VERSION_MINOR,
 		FIRMWARE_VERSION_PATCH,
-		RADIO_LIBRARY_RAIL,
-		rail_version.major,
-		rail_version.minor,
-		rail_version.rev,
+		library,
+		lib_major,
+		lib_minor,
+		lib_patch,
 		0x01, // LEN_BITMASK
 		0 |
 			(1 << (FUNC_ID_GET_FIRMWARE_INFO - 1)) |
@@ -35,7 +38,7 @@ void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len)
 	uart_transmit_frame(FRAME_TYPE_RESP, FUNC_ID_GET_FIRMWARE_INFO, resp, sizeof(resp));
 }
 
-void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len)
+void handle_cmd_setup_radio(uint8_t *payload, uint8_t len)
 {
 	setup_radio_cmd_t subcmd = payload[0];
 	switch (subcmd)
@@ -51,9 +54,9 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 			channel_cfg = payload[2];
 		}
 
-		channel_info_t channels[RAIL_NUM_ZWAVE_CHANNELS] = {0};
+		channel_info_t channels[RADIO_MAX_CHANNELS] = {0};
 		uint8_t num_channels = 0;
-		bool result = radio_set_region(rail_handle, region, channel_cfg, &num_channels, channels);
+		bool result = radio_set_region(region, channel_cfg, &num_channels, channels);
 		if (result)
 		{
 			uint8_t resp[3 + num_channels * 5];
@@ -82,12 +85,12 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 	{
 		// HOST -> ZW: GET_REGION
 		// ZW -> HOST: GET_REGION | REGION | CHANNEL_CFG | NUM_CHANNELS | CH_1_FREQ (32 bit) | CH_1_BAUD | ... | CH_N_FREQ (32 bit) | CH_N_BAUD
-		zwave_region_t region = REGION_UNKNOWN;
+		zwave_region_t region = ZWAVE_REGION_UNKNOWN;
 		zwave_channel_cfg_t channel_cfg = CHANNEL_CFG_CLASSIC;
-		channel_info_t channels[RAIL_NUM_ZWAVE_CHANNELS] = {0};
+		channel_info_t channels[RADIO_MAX_CHANNELS] = {0};
 		uint8_t num_channels = 0;
 
-		radio_get_region(rail_handle, &region, &channel_cfg, &num_channels, channels);
+		radio_get_region(&region, &channel_cfg, &num_channels, channels);
 
 		uint8_t resp[4 + num_channels * 5];
 		resp[0] = subcmd;
@@ -111,22 +114,9 @@ void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t
 	{
 		// HOST -> ZW: GET_TX_POWER_RANGE
 		// ZW -> HOST: GET_TX_POWER_RANGE | MIN_POWER (int16 BE, deci-dBm) | MAX_POWER (int16 BE, deci-dBm)
-		RAIL_TxPowerConfig_t pa_config = {0};
-		RAIL_GetTxPowerConfig(rail_handle, &pa_config);
-
-		RAIL_TxPowerMode_t mode = pa_config.mode;
-		RAIL_TxPowerLevel_t min_level = 0;
-		RAIL_TxPowerLevel_t max_level = 0;
 		int16_t min_power = 0;
 		int16_t max_power = 0;
-
-		// RAIL fills in the levels only when it supports the mode. An
-		// unsupported mode reports an empty 0 dBm range
-		if (RAIL_SupportsTxPowerModeAlt(rail_handle, &mode, &max_level, &min_level))
-		{
-			min_power = RAIL_ConvertRawToDbm(rail_handle, mode, min_level);
-			max_power = RAIL_ConvertRawToDbm(rail_handle, mode, max_level);
-		}
+		radio_get_tx_power_range(&min_power, &max_power);
 
 		uint8_t resp[5] = {
 			subcmd,
@@ -242,7 +232,7 @@ void callback_cmd_transmit(tx_result_t result)
 		sizeof(payload));
 }
 
-void handle_cmd_transmit_beam(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len)
+void handle_cmd_transmit_beam(uint8_t *payload, uint8_t len)
 {
 	// HOST -> ZW: TX_POWER (int16 BE, deci-dBm, or TX_POWER_UNCHANGED) | NUM_FRAGMENTS | FRAGMENT_DURATION_MS (u16 BE) | FRAGMENT_PERIOD_MS (u16 BE) | NUM_CHANNELS | ...CHANNELS | ...DATA
 	// ZW -> HOST: TX_RESULT
@@ -279,7 +269,6 @@ void handle_cmd_transmit_beam(RAIL_Handle_t rail_handle, uint8_t *payload, uint8
 	uint8_t data_len = len - 8 - num_channels;
 
 	radio_transmit_beam(
-		rail_handle,
 		power_deci_dbm,
 		num_fragments,
 		fragment_duration_ms,
@@ -310,7 +299,7 @@ void callback_cmd_transmit_beam(tx_result_t result)
 		sizeof(payload));
 }
 
-void handle_cmd_abort_beam(RAIL_Handle_t rail_handle)
+void handle_cmd_abort_beam(void)
 {
 	// HOST -> ZW: ()
 	// ZW -> HOST: 1
@@ -320,10 +309,10 @@ void handle_cmd_abort_beam(RAIL_Handle_t rail_handle)
 	uint8_t resp[1] = {1};
 	uart_transmit_frame(FRAME_TYPE_RESP, FUNC_ID_ABORT_BEAM, resp, sizeof(resp));
 
-	radio_abort_beam(rail_handle);
+	radio_abort_beam();
 }
 
-void handle_cmd_measure_noise_floor(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len)
+void handle_cmd_measure_noise_floor(uint8_t *payload, uint8_t len)
 {
 	// HOST -> ZW: CHANNEL
 	// ZW -> HOST: NOISE_FLOOR (int8, dBm, clamped to -120..30, or 127 when
@@ -333,7 +322,7 @@ void handle_cmd_measure_noise_floor(RAIL_Handle_t rail_handle, uint8_t *payload,
 	int8_t noise = NOISE_FLOOR_NOT_AVAILABLE;
 	if (len >= 1)
 	{
-		noise = radio_measure_noise_floor_cmd(rail_handle, payload[0]);
+		noise = radio_measure_noise_floor_cmd(payload[0]);
 	}
 
 	uint8_t resp[1] = {(uint8_t)noise};
