@@ -45,6 +45,15 @@ tools/fetch_trident_sdk.sh
 tools/build_trident.sh
 ```
 
+Without a local ARM toolchain and Python setup, build inside the toolchain
+image Trident IoT publishes for each SDK release. It is a public image, so
+only docker is needed:
+
+```sh
+tools/fetch_trident_sdk.sh
+tools/build_trident.sh --container
+```
+
 `tools/build_trident.sh` configures and builds the `T32CZ20.Release` preset and
 copies the results to `artifact/trident/`:
 
@@ -75,6 +84,25 @@ Pass these as `-D<name>=<value>` when configuring:
 | `RCP_DEFAULT_REGION` | `ZWAVE_REGION_EU` | Region the radio starts in before the host configures one |
 | `RCP_TX_MAX_POWER_DECI_DBM` | `140` | Power class of the module, `140` or `200`. Selects the driver's 14 dBm or 20 dBm power tables, like the SDK sample applications. |
 | `TRIDENT_SDK_DIR` | `trident/tridentiot-sdk` | Location of the unpacked SDK |
+
+## Using elcap
+
+[elcap](https://tridentiot.github.io/elcap-cli/) is Trident IoT's project
+tool. `trident.toml` describes this directory as an elcap project, so the
+device commands work from `trident/` after `elcap login`:
+
+```sh
+cd trident
+elcap device discover
+elcap flash                  # flashes the default hex from the last build
+elcap tokens read
+```
+
+`elcap build` does not work for this project. It mounts only the project
+directory into its build container, and the shared protocol sources live in
+the repository root. Use `tools/build_trident.sh`, which runs the same CMake
+presets, or `tools/build_trident.sh --container` for the same toolchain image
+elcap uses. The GitHub Actions build needs neither elcap nor a Trident account.
 
 ## Differences to the EFR32 build
 

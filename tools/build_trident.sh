@@ -9,12 +9,29 @@
 # Optional env variables:
 # PRESET: CMake preset to build (default: T32CZ20.Release)
 # TRIDENT_SDK_DIR: SDK location when not at trident/tridentiot-sdk
+#
+# Pass --container to run the build inside the Trident IoT toolchain image
+# instead of using the tools installed on this machine. The image is public,
+# so this needs docker but no Trident account.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PRESET="${PRESET:-T32CZ20.Release}"
 PROJ_NAME=zwave_rcp
+
+# Same image elcap uses for its builds, tagged with the SDK release
+CONTAINER_IMAGE="ghcr.io/tridentiot/tridentiot-sdk-releases:v2026.06.00-ga"
+
+if [ "${1:-}" = "--container" ]; then
+	# The image's entrypoint creates a user with USER_ID and runs the command
+	# as that user, so the build output belongs to the caller
+	exec docker run --rm \
+		-e USER_ID="$(id -u)" -e GROUP_ID="$(id -g)" \
+		-e PRESET="$PRESET" \
+		-v "$REPO_ROOT":/trident -w /trident \
+		"$CONTAINER_IMAGE" tools/build_trident.sh
+fi
 
 cd "$REPO_ROOT/trident"
 
