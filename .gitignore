@@ -15,7 +15,7 @@ upload/
 /*.mak
 ################ Trident IoT build ##########################
 # The SDK is downloaded by tools/fetch_trident_sdk.sh
-trident/tridentiot-sdk/
+trident/tridentiot-sdk
 trident/build/
 # Throwaway signing keys the SDK generates on the first build
 trident/keys/
