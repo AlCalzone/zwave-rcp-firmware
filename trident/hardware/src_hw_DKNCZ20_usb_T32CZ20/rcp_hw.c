@@ -10,10 +10,9 @@
 #include "rcp_app.h"
 
 #ifndef RCP_UART_BAUD_RATE
-/// The T32CZ20 UART only offers a fixed set of baud rates and 460800, which
-/// the EFR32 build uses, is not one of them. 230400 is the closest supported
-/// rate that keeps up with the radio.
-#define RCP_UART_BAUD_RATE 230400
+/// The ZPAL driver offers fixed baud rates. 500000 is closest to the EFR32
+/// build's 460800 baud.
+#define RCP_UART_BAUD_RATE 500000
 #endif
 
 // The ZPAL driver receives into this ring buffer. The task drains it on every

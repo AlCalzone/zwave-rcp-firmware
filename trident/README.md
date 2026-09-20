@@ -80,7 +80,7 @@ Pass these as `-D<name>=<value>` when configuring:
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `RCP_UART_BAUD_RATE` | `230400` | Host UART baud rate. Must be one the T32CZ20 UART supports (115200, 230400, 500000, 1000000, ...). 460800, which the EFR32 build uses, is not available. |
+| `RCP_UART_BAUD_RATE` | `500000` | Host UART baud rate. Must be supported by the Trident SDK's ZPAL driver (115200, 230400, 500000, 1000000, ...). 500000 is closest to the EFR32 build's 460800 baud. |
 | `RCP_DEFAULT_REGION` | `ZWAVE_REGION_EU` | Region the radio starts in before the host configures one |
 | `RCP_TX_MAX_POWER_DECI_DBM` | `140` | Power class of the module, `140` or `200`. Selects the driver's 14 dBm or 20 dBm power tables, like the SDK sample applications. |
 | `TRIDENT_SDK_DIR` | `trident/tridentiot-sdk` | Location of the unpacked SDK |
@@ -108,7 +108,7 @@ elcap uses. The GitHub Actions build needs neither elcap nor a Trident account.
 
 - `FUNC_ID_GET_FIRMWARE_INFO` reports `LIB_TYPE` 1 (ZPAL) and the Trident IoT
   SDK version as `YY.MM.PATCH`.
-- The host UART runs at 230400 baud by default, see above.
+- The host UART runs at 500000 baud by default, see above.
 - Received frames carry an LQI of 0, the ZPAL radio reports none.
 - The ZPAL driver delivers received frames including their checksum. The
   backend strips it so the host sees the same frame content as from EFR32.

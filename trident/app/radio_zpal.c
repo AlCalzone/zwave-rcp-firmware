@@ -1,6 +1,10 @@
 /// Radio backend on the Z-Wave Platform Abstraction Layer (ZPAL) of the
 /// Trident IoT SDK, for the T32CZ20 radio.
 ///
+/// ZPAL configures the hardware from the SDK's region tables. Its raw transmit
+/// API does not expose those tables. Each transmission still requires explicit
+/// PHY parameters. This backend mirrors the metadata needed by the Serial API.
+///
 /// Implements radio.h. Everything here runs on the RCP task, except the two
 /// ZPAL completion callbacks which only record the event and wake the task.
 
