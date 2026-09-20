@@ -2,7 +2,10 @@
 #define SERIAL_API_H
 
 #include <stdint.h>
-#include "rail.h"
+
+/// Most channels any supported region has. Silicon Labs RAIL and Trident IoT
+/// ZPAL both describe a region with up to four channels.
+#define RADIO_MAX_CHANNELS 4
 
 #define SOF 0x01
 #define ACK 0x06
@@ -29,9 +32,13 @@ typedef enum
 	FRAME_TYPE_CALLBACK = 0x02,
 } frame_type_t;
 
+/// The radio library the firmware was built on, reported by FUNC_ID_GET_FIRMWARE_INFO
 typedef enum
 {
-  RADIO_LIBRARY_RAIL,
+  /// Silicon Labs RAIL on EFR32 series 2
+  RADIO_LIBRARY_RAIL = 0,
+  /// Z-Wave Platform Abstraction Layer (ZPAL) of the Trident IoT SDK on T32CZ20
+  RADIO_LIBRARY_ZPAL = 1,
 } radio_library_t;
 
 typedef enum
@@ -104,19 +111,19 @@ typedef enum {
 } radio_capability_t;
 
 typedef enum {
-	REGION_EU = 0,
-	REGION_US,
-	REGION_ANZ,
-	REGION_HK,
-	REGION_IN = 5,
-	REGION_IL,
-	REGION_RU,
-	REGION_CN,
-	REGION_US_LR,
-	REGION_EU_LR = 11,
-	REGION_JP = 32,
-	REGION_KR,
-	REGION_UNKNOWN = 0xfe,
+	ZWAVE_REGION_EU = 0,
+	ZWAVE_REGION_US,
+	ZWAVE_REGION_ANZ,
+	ZWAVE_REGION_HK,
+	ZWAVE_REGION_IN = 5,
+	ZWAVE_REGION_IL,
+	ZWAVE_REGION_RU,
+	ZWAVE_REGION_CN,
+	ZWAVE_REGION_US_LR,
+	ZWAVE_REGION_EU_LR = 11,
+	ZWAVE_REGION_JP = 32,
+	ZWAVE_REGION_KR,
+	ZWAVE_REGION_UNKNOWN = 0xfe,
 } zwave_region_t;
 
 typedef enum {
@@ -142,7 +149,7 @@ typedef struct {
 void handle_cmd_get_firmware_info(uint8_t *payload, uint8_t len);
 
 /// @brief Handle a request to configure the radio
-void handle_cmd_setup_radio(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len);
+void handle_cmd_setup_radio(uint8_t *payload, uint8_t len);
 
 /// @brief Handle a transmit request
 void handle_cmd_transmit(uint8_t *payload, uint8_t len);
@@ -150,15 +157,15 @@ void respond_cmd_transmit(tx_result_t result);
 void callback_cmd_transmit(tx_result_t result);
 
 /// @brief Handle a request to transmit a wakeup beam
-void handle_cmd_transmit_beam(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len);
+void handle_cmd_transmit_beam(uint8_t *payload, uint8_t len);
 void respond_cmd_transmit_beam(tx_result_t result);
 void callback_cmd_transmit_beam(tx_result_t result);
 
 /// @brief Handle a request to stop an ongoing beam
-void handle_cmd_abort_beam(RAIL_Handle_t rail_handle);
+void handle_cmd_abort_beam(void);
 
 /// @brief Handle a request to measure the noise floor on a channel
-void handle_cmd_measure_noise_floor(RAIL_Handle_t rail_handle, uint8_t *payload, uint8_t len);
+void handle_cmd_measure_noise_floor(uint8_t *payload, uint8_t len);
 
 /// @brief Report a received frame to the host
 void notify_receive(uint8_t *data, uint8_t len, int8_t rssi, uint8_t lqi, uint8_t channel);

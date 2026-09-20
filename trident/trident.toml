@@ -1,0 +1,13 @@
+# elcap project description. Lets `elcap build` and `elcap flash` run from
+# this directory. The CI build does not use elcap, see tools/build_trident.sh.
+[project]
+name = "zwave_rcp"
+category = "z-wave"
+target = "T32CZ20B"
+# The SDK sample this project is laid out like: a Z-Wave radio application
+# without the protocol stack
+template = "z-wave/radio_cli"
+default_hex = "dkncz20_usb_t32cz20_signed_combined.hex"
+
+[sdk]
+version = "v2026.06.00-ga"

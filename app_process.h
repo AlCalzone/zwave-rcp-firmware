@@ -35,6 +35,8 @@
 // -----------------------------------------------------------------------------
 #include "rail.h"
 #include "serial_api.h"
+#include "radio.h"
+#include "serial_link.h"
 
 // -----------------------------------------------------------------------------
 //                              Macros and Typedefs
@@ -49,7 +51,8 @@
 // -----------------------------------------------------------------------------
 
 /******************************************************************************
- * Set up the rail TX fifo for later usage
+ * Set up the rail TX fifo for later usage and remember the RAIL handle the
+ * radio backend (radio.h) operates on
  * @param[in] rail_handle Which rail handler should be updated
  *****************************************************************************/
 void set_up_tx_fifo(RAIL_Handle_t rail_handle);
@@ -64,42 +67,12 @@ void set_up_tx_fifo(RAIL_Handle_t rail_handle);
  *****************************************************************************/
 void app_process_action(RAIL_Handle_t rail_handle);
 
-/// @brief Queue raw data for transmission over UART
-void uart_transmit(uint8_t *data, uint32_t len);
-/// @brief Queue a frame for transmission over UART
-void uart_transmit_frame(frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint32_t payload_len);
-/// @brief Queue a single byte for transmission over UART
-void uart_transmit_byte(uint8_t byte);
+// The UART transmit functions (uart_transmit, uart_transmit_byte) and the
+// radio backend functions (radio_transmit, radio_transmit_beam, ...) that this
+// file implements are declared in serial_link.h and radio.h.
 
-/// @brief Queue raw data for transmission over radio
-/// @param power_deci_dbm Transmit power in deci-dBm, coerced by RAIL to the channel's maximum
-/// @param flags Bitmask of TRANSMIT_FLAG_*
-/// @param replacements Validated OFFSET | SOURCE pairs to patch into data right before the transmit
-void radio_transmit(uint8_t channel, int16_t power_deci_dbm, uint8_t flags, uint8_t *data, uint32_t len, const uint8_t *replacements, uint8_t num_replacements);
-/// @brief Measure the noise floor on a channel and restart RX, returning 127 when the radio is busy or the measurement failed
-int8_t radio_measure_noise_floor_cmd(RAIL_Handle_t rail_handle, uint8_t channel);
-/// @brief Start a wakeup beam that repeats data back to back for fragment_duration_ms per fragment
-/// @param power_deci_dbm Transmit power in deci-dBm, coerced by RAIL to the channel's maximum
-/// @param fragment_period_ms Spacing between fragment starts, ignored when num_fragments is 1
-/// @param channels Channel per fragment, indexed by the fragment number modulo num_channels
-void radio_transmit_beam(
-    RAIL_Handle_t rail_handle,
-    int16_t power_deci_dbm,
-    uint8_t num_fragments,
-    uint16_t fragment_duration_ms,
-    uint16_t fragment_period_ms,
-    uint8_t num_channels,
-    const uint8_t *channels,
-    const uint8_t *data,
-    uint8_t data_len);
-/// @brief Stop an ongoing beam and return the radio to RX
-void radio_abort_beam(RAIL_Handle_t rail_handle);
-/// @brief Change the region of the radio
-bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_channel_cfg_t channel_cfg, uint8_t* num_channels, channel_info_t* channels);
 /// @brief Adopt the region RAIL currently has configured: channel count, RX channel hopping and RX restart
 void radio_sync_active_region(RAIL_Handle_t rail_handle);
-/// @brief Read the radio's region, channel configuration and channel list
-void radio_get_region(RAIL_Handle_t rail_handle, zwave_region_t* region, zwave_channel_cfg_t* channel_cfg, uint8_t* num_channels, channel_info_t* channels);
 
 // Interrupt handlers for UART
 void EUSART0_RX_IRQHandler(void);

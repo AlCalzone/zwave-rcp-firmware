@@ -38,6 +38,8 @@
 
 #include "common.h"
 #include "serial_api.h"
+#include "radio.h"
+#include "serial_link.h"
 #include "app_init.h"
 #include "app_process.h"
 
@@ -84,9 +86,6 @@ typedef enum
 //                          Static Function Declarations
 // -----------------------------------------------------------------------------
 static void handle_received_packet(RAIL_Handle_t rail_handle);
-static void uart_handle_rx(RAIL_Handle_t rail_handle);
-static void reset_rx_fifo(uint8_t new_start);
-static void uart_handle_frame(RAIL_Handle_t rail_handle, frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint8_t len);
 static void export_channel_info(const RAIL_ZWAVE_RegionConfig_t *region_config, uint8_t *num_channels, channel_info_t *channels);
 static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len);
 static int8_t radio_measure_noise_floor(RAIL_Handle_t rail_handle, uint8_t channel);
@@ -106,16 +105,19 @@ static void beam_timer_expired(RAIL_Handle_t rail_handle);
 // -----------------------------------------------------------------------------
 rail_state_t rail_state = RAILS_IDLE;
 
-uint8_t UART_RX_FIFO[UART_RX_FIFO_SIZE] = {0};
-/// The position of the write cursor in the RX FIFO
-uint32_t uart_rx_pos = 0;
+/// The RAIL instance the radio backend operates on, stored by set_up_tx_fifo()
+/// so the serial API protocol layer stays independent of RAIL
+static RAIL_Handle_t g_rail_handle = NULL;
+
+// The channel arrays the serial API hands over are sized RADIO_MAX_CHANNELS
+_Static_assert(RAIL_NUM_ZWAVE_CHANNELS == RADIO_MAX_CHANNELS, "RADIO_MAX_CHANNELS must match RAIL_NUM_ZWAVE_CHANNELS");
+
+// UART_RX_FIFO, uart_rx_pos and uart_rx_done live in serial_link.c
 
 uint8_t UART_TX_FIFO[UART_TX_FIFO_SIZE] = {0};
 uint32_t uart_tx_pos = 0;
 uint32_t uart_tx_len = 0;
 
-/// New UART RX data arrived and awaits processing
-bool uart_rx_done = false;
 bool uart_tx_done = false;
 
 static uint8_t tx_channel = 0;
@@ -236,7 +238,41 @@ static __ALIGNED(RAIL_FIFO_ALIGNMENT) uint8_t tx_fifo[RAIL_FIFO_SIZE];
 void set_up_tx_fifo(RAIL_Handle_t rail_handle)
 {
   uint16_t allocated_tx_fifo_size = 0;
+  g_rail_handle = rail_handle;
   allocated_tx_fifo_size = RAIL_SetTxFifo(rail_handle, tx_fifo, 0, RAIL_FIFO_SIZE);
+  (void)allocated_tx_fifo_size;
+}
+
+void radio_get_library_info(radio_library_t *library, uint8_t *major, uint8_t *minor, uint8_t *patch)
+{
+  RAIL_Version_t rail_version = {0};
+  RAIL_GetVersion(&rail_version, false);
+
+  *library = RADIO_LIBRARY_RAIL;
+  *major = rail_version.major;
+  *minor = rail_version.minor;
+  *patch = rail_version.rev;
+}
+
+void radio_get_tx_power_range(int16_t *min_deci_dbm, int16_t *max_deci_dbm)
+{
+  RAIL_Handle_t rail_handle = g_rail_handle;
+  RAIL_TxPowerConfig_t pa_config = {0};
+  RAIL_GetTxPowerConfig(rail_handle, &pa_config);
+
+  RAIL_TxPowerMode_t mode = pa_config.mode;
+  RAIL_TxPowerLevel_t min_level = 0;
+  RAIL_TxPowerLevel_t max_level = 0;
+  *min_deci_dbm = 0;
+  *max_deci_dbm = 0;
+
+  // RAIL fills in the levels only when it supports the mode. An
+  // unsupported mode reports an empty 0 dBm range
+  if (RAIL_SupportsTxPowerModeAlt(rail_handle, &mode, &max_level, &min_level))
+  {
+    *min_deci_dbm = RAIL_ConvertRawToDbm(rail_handle, mode, min_level);
+    *max_deci_dbm = RAIL_ConvertRawToDbm(rail_handle, mode, max_level);
+  }
 }
 
 /******************************************************************************
@@ -316,7 +352,7 @@ void app_process_action(RAIL_Handle_t rail_handle)
   if (uart_rx_done)
   {
     uart_rx_done = false;
-    uart_handle_rx(rail_handle);
+    serial_link_process_rx();
   }
 }
 
@@ -330,27 +366,6 @@ void uart_transmit(uint8_t *data, uint32_t len)
   EUSART_IntEnable(EUSART0, EUSART_IEN_TXFL);
 }
 
-/// @brief Queue a frame for transmission over UART
-void uart_transmit_frame(frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint32_t payload_len)
-{
-  uint8_t frame_len = payload_len + 3; // length, type, func_id
-  uint8_t frame[frame_len + 2];        // SOF, ...rest, chksum
-  uint8_t chksum = 0xff ^ frame_len ^ frame_type ^ func_id;
-  uint8_t i = 0;
-  frame[i++] = SOF;
-  frame[i++] = frame_len;
-  frame[i++] = frame_type;
-  frame[i++] = func_id;
-  for (int j = 0; j < payload_len; j++)
-  {
-    frame[i++] = payload[j];
-    chksum ^= payload[j];
-  }
-  frame[i++] = chksum;
-
-  uart_transmit(frame, frame_len + 2);
-}
-
 /// @brief Queue a single byte for transmission over UART
 void uart_transmit_byte(uint8_t byte)
 {
@@ -360,173 +375,46 @@ void uart_transmit_byte(uint8_t byte)
   EUSART_IntEnable(EUSART0, EUSART_IEN_TXFL);
 }
 
-/// @brief Handle a received frame over UART
-static void uart_handle_rx(RAIL_Handle_t rail_handle)
+bool radio_set_region(zwave_region_t region, zwave_channel_cfg_t channel_cfg, uint8_t *num_channels, channel_info_t *channels)
 {
-  // Advance to the first SOF byte
-  int i = 0;
-  while (
-      i < uart_rx_pos
-      && UART_RX_FIFO[i] != SOF)
-  {
-    i++;
-  }
-  if (i == uart_rx_pos)
-  {
-    // The buffer contains no SOF
-    reset_rx_fifo(i);
-    return;
-  }
-
-  // We need SOF and LEN to validate the frame length
-  uint8_t remaining = uart_rx_pos - i;
-  if (remaining < 2)
-  {
-    return;
-  }
-
-  uint8_t chksum = 0xff;
-  // Skip SOF
-  i++;
-
-  // Read the frame length, which excludes SOF and checksum
-  uint8_t len = UART_RX_FIFO[i++];
-  chksum ^= len;
-
-  if (len < 3)
-  {
-    // LEN must cover at least the frame type, the function ID and the checksum.
-    // Anything shorter underflows the payload length passed to the handlers.
-    reset_rx_fifo(i);
-    uart_transmit_byte(NAK);
-    return;
-  }
-
-  remaining = uart_rx_pos - i;
-  if (remaining < len)
-  {
-    // Wait for the rest of the frame to arrive
-    return;
-  }
-
-  // Extract frame and update checksum
-  uint8_t cmd[len - 1];
-  for (int j = 0; j < len - 1; j++)
-  {
-    cmd[j] = UART_RX_FIFO[i++];
-    chksum ^= cmd[j];
-  }
-
-  // XOR in the received checksum so a match leaves chksum at 0
-  chksum ^= UART_RX_FIFO[i++];
-
-  // Move remaining data to start of buffer
-  // FIXME: Use a ringbuffer so we can avoid this
-  if (i < uart_rx_pos)
-  {
-    reset_rx_fifo(i);
-    // Trigger another processing pass for the buffered data
-    uart_rx_done = true;
-  }
-  uart_rx_pos = 0;
-
-  if (chksum == 0)
-  {
-    uart_transmit_byte(ACK);
-    uart_handle_frame(rail_handle, cmd[0], cmd[1], &cmd[2], len - 3);
-  }
-  else
-  {
-    // Try to re-sync
-    uart_transmit_byte(NAK);
-  }
-}
-
-static void reset_rx_fifo(uint8_t new_start)
-{
-  if (new_start < uart_rx_pos)
-  {
-    memmove(UART_RX_FIFO, &UART_RX_FIFO[new_start], uart_rx_pos - new_start);
-  }
-  uart_rx_pos = 0;
-}
-
-static void uart_handle_frame(RAIL_Handle_t rail_handle, frame_type_t frame_type, func_id_t func_id, uint8_t *payload, uint8_t len)
-{
-  if (frame_type != FRAME_TYPE_REQ)
-  {
-    return;
-  }
-
-  switch (func_id)
-  {
-  case FUNC_ID_GET_FIRMWARE_INFO:
-    handle_cmd_get_firmware_info(payload, len);
-    break;
-
-  case FUNC_ID_SETUP_RADIO:
-    handle_cmd_setup_radio(rail_handle, payload, len);
-    break;
-
-  case FUNC_ID_TRANSMIT:
-    handle_cmd_transmit(payload, len);
-    break;
-
-  case FUNC_ID_TRANSMIT_BEAM:
-    handle_cmd_transmit_beam(rail_handle, payload, len);
-    break;
-
-  case FUNC_ID_ABORT_BEAM:
-    handle_cmd_abort_beam(rail_handle);
-    break;
-
-  case FUNC_ID_MEASURE_NOISE_FLOOR:
-    handle_cmd_measure_noise_floor(rail_handle, payload, len);
-    break;
-  default:
-    break;
-  }
-}
-
-bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_channel_cfg_t channel_cfg, uint8_t *num_channels, channel_info_t *channels)
-{
+  RAIL_Handle_t rail_handle = g_rail_handle;
   const RAIL_ZWAVE_RegionConfig_t *region_config;
 
   switch (region)
   {
-  case REGION_EU:
+  case ZWAVE_REGION_EU:
     region_config = &RAIL_ZWAVE_REGION_EU;
     break;
-  case REGION_US:
+  case ZWAVE_REGION_US:
     region_config = &RAIL_ZWAVE_REGION_US;
     break;
-  case REGION_ANZ:
+  case ZWAVE_REGION_ANZ:
     region_config = &RAIL_ZWAVE_REGION_ANZ;
     break;
-  case REGION_HK:
+  case ZWAVE_REGION_HK:
     region_config = &RAIL_ZWAVE_REGION_HK;
     break;
-  case REGION_IN:
+  case ZWAVE_REGION_IN:
     region_config = &RAIL_ZWAVE_REGION_IN;
     break;
-  case REGION_IL:
+  case ZWAVE_REGION_IL:
     region_config = &RAIL_ZWAVE_REGION_IL;
     break;
-  case REGION_RU:
+  case ZWAVE_REGION_RU:
     region_config = &RAIL_ZWAVE_REGION_RU;
     break;
-  case REGION_CN:
+  case ZWAVE_REGION_CN:
     region_config = &RAIL_ZWAVE_REGION_CN;
     break;
-  case REGION_JP:
+  case ZWAVE_REGION_JP:
     region_config = &RAIL_ZWAVE_REGION_JP;
     break;
-  case REGION_KR:
+  case ZWAVE_REGION_KR:
     region_config = &RAIL_ZWAVE_REGION_KR;
     break;
 
     // For LR regions, the RAIL config also depends on the channel configuration
-  case REGION_US_LR:
+  case ZWAVE_REGION_US_LR:
     switch (channel_cfg)
     {
     case CHANNEL_CFG_CLASSIC_LR_A:
@@ -542,7 +430,7 @@ bool radio_set_region(RAIL_Handle_t rail_handle, zwave_region_t region, zwave_ch
       return false;
     }
     break;
-  case REGION_EU_LR:
+  case ZWAVE_REGION_EU_LR:
     switch (channel_cfg)
     {
     case CHANNEL_CFG_CLASSIC_LR_A:
@@ -583,85 +471,86 @@ static const RAIL_ZWAVE_RegionConfig_t *resolve_active_region(RAIL_Handle_t rail
   switch (rail_region)
   {
   case RAIL_ZWAVE_REGIONID_EU:
-    *region = REGION_EU;
+    *region = ZWAVE_REGION_EU;
     region_config = &RAIL_ZWAVE_REGION_EU;
     break;
   case RAIL_ZWAVE_REGIONID_US:
-    *region = REGION_US;
+    *region = ZWAVE_REGION_US;
     region_config = &RAIL_ZWAVE_REGION_US;
     break;
   case RAIL_ZWAVE_REGIONID_ANZ:
-    *region = REGION_ANZ;
+    *region = ZWAVE_REGION_ANZ;
     region_config = &RAIL_ZWAVE_REGION_ANZ;
     break;
   case RAIL_ZWAVE_REGIONID_HK:
-    *region = REGION_HK;
+    *region = ZWAVE_REGION_HK;
     region_config = &RAIL_ZWAVE_REGION_HK;
     break;
   case RAIL_ZWAVE_REGIONID_IN:
-    *region = REGION_IN;
+    *region = ZWAVE_REGION_IN;
     region_config = &RAIL_ZWAVE_REGION_IN;
     break;
   case RAIL_ZWAVE_REGIONID_JP:
-    *region = REGION_JP;
+    *region = ZWAVE_REGION_JP;
     region_config = &RAIL_ZWAVE_REGION_JP;
     break;
   case RAIL_ZWAVE_REGIONID_RU:
-    *region = REGION_RU;
+    *region = ZWAVE_REGION_RU;
     region_config = &RAIL_ZWAVE_REGION_RU;
     break;
   case RAIL_ZWAVE_REGIONID_IL:
-    *region = REGION_IL;
+    *region = ZWAVE_REGION_IL;
     region_config = &RAIL_ZWAVE_REGION_IL;
     break;
   case RAIL_ZWAVE_REGIONID_KR:
-    *region = REGION_KR;
+    *region = ZWAVE_REGION_KR;
     region_config = &RAIL_ZWAVE_REGION_KR;
     break;
   case RAIL_ZWAVE_REGIONID_CN:
-    *region = REGION_CN;
+    *region = ZWAVE_REGION_CN;
     region_config = &RAIL_ZWAVE_REGION_CN;
     break;
   case RAIL_ZWAVE_REGIONID_US_LR1:
-    *region = REGION_US_LR;
+    *region = ZWAVE_REGION_US_LR;
     *channel_cfg = CHANNEL_CFG_CLASSIC_LR_A;
     region_config = &RAIL_ZWAVE_REGION_US_LR1;
     break;
   case RAIL_ZWAVE_REGIONID_US_LR2:
-    *region = REGION_US_LR;
+    *region = ZWAVE_REGION_US_LR;
     *channel_cfg = CHANNEL_CFG_CLASSIC_LR_B;
     region_config = &RAIL_ZWAVE_REGION_US_LR2;
     break;
   case RAIL_ZWAVE_REGIONID_US_LR3:
-    *region = REGION_US_LR;
+    *region = ZWAVE_REGION_US_LR;
     *channel_cfg = CHANNEL_CFG_LR;
     region_config = &RAIL_ZWAVE_REGION_US_LR3;
     break;
   case RAIL_ZWAVE_REGIONID_EU_LR1:
-    *region = REGION_EU_LR;
+    *region = ZWAVE_REGION_EU_LR;
     *channel_cfg = CHANNEL_CFG_CLASSIC_LR_A;
     region_config = &RAIL_ZWAVE_REGION_EU_LR1;
     break;
   case RAIL_ZWAVE_REGIONID_EU_LR2:
-    *region = REGION_EU_LR;
+    *region = ZWAVE_REGION_EU_LR;
     *channel_cfg = CHANNEL_CFG_CLASSIC_LR_B;
     region_config = &RAIL_ZWAVE_REGION_EU_LR2;
     break;
   case RAIL_ZWAVE_REGIONID_EU_LR3:
-    *region = REGION_EU_LR;
+    *region = ZWAVE_REGION_EU_LR;
     *channel_cfg = CHANNEL_CFG_LR;
     region_config = &RAIL_ZWAVE_REGION_EU_LR3;
     break;
   default:
-    *region = REGION_UNKNOWN;
+    *region = ZWAVE_REGION_UNKNOWN;
     return NULL;
   }
 
   return region_config;
 }
 
-void radio_get_region(RAIL_Handle_t rail_handle, zwave_region_t *region, zwave_channel_cfg_t *channel_cfg, uint8_t *num_channels, channel_info_t *channels)
+void radio_get_region(zwave_region_t *region, zwave_channel_cfg_t *channel_cfg, uint8_t *num_channels, channel_info_t *channels)
 {
+  RAIL_Handle_t rail_handle = g_rail_handle;
   const RAIL_ZWAVE_RegionConfig_t *region_config = resolve_active_region(rail_handle, region, channel_cfg);
   if (region_config == NULL)
   {
@@ -820,8 +709,9 @@ static int8_t radio_measure_noise_floor(RAIL_Handle_t rail_handle, uint8_t chann
   return (int8_t)dbm;
 }
 
-int8_t radio_measure_noise_floor_cmd(RAIL_Handle_t rail_handle, uint8_t channel)
+int8_t radio_measure_noise_floor_cmd(uint8_t channel)
 {
+  RAIL_Handle_t rail_handle = g_rail_handle;
   if (out_packet_len > 0 || tx_in_flight || rail_packet_sent || tx_error != 0 || beam_active)
   {
     // Measuring idles the radio, which would cut the transmit or beam short
@@ -913,7 +803,6 @@ static void rail_transmit(RAIL_Handle_t rail_handle, uint8_t *data, uint32_t len
 }
 
 void radio_transmit_beam(
-    RAIL_Handle_t rail_handle,
     int16_t power_deci_dbm,
     uint8_t num_fragments,
     uint16_t fragment_duration_ms,
@@ -923,6 +812,7 @@ void radio_transmit_beam(
     const uint8_t *data,
     uint8_t data_len)
 {
+  RAIL_Handle_t rail_handle = g_rail_handle;
   if (out_packet_len > 0 || tx_in_flight || rail_packet_sent || tx_error != 0 || beam_active)
   {
     // There is already a packet in the buffer or on the air, or a completed
@@ -977,8 +867,9 @@ void radio_transmit_beam(
   respond_cmd_transmit_beam(result);
 }
 
-void radio_abort_beam(RAIL_Handle_t rail_handle)
+void radio_abort_beam(void)
 {
+  RAIL_Handle_t rail_handle = g_rail_handle;
   if (!beam_active)
   {
     return;

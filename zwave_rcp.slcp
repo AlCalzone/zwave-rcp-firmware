@@ -21,13 +21,16 @@ source:
 - {path: app_init.c}
 - {path: app_process.c}
 - {path: serial_api.c}
+- {path: serial_link.c}
 include:
 - path: .
   file_list:
   - {path: app_init.h}
   - {path: app_process.h}
   - {path: common.h}
+  - {path: radio.h}
   - {path: serial_api.h}
+  - {path: serial_link.h}
 sdk: {id: simplicity_sdk, version: 2024.12.1}
 toolchain_settings:
 - {value: debug, option: optimize}
